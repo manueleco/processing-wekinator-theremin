@@ -209,3 +209,7 @@ This project demonstrates a machine-learning digital music interface:
 `gesture features -> Wekinator model -> musical control outputs -> sound/visual feedback`
 
 The direct mode shows a programmed mapping. The Wekinator mode shows a learned mapping, allowing non-linear and more expressive behavior than a fixed `mouseX -> pitch` rule.
+
+For more possible AI training directions, see:
+
+`AI_TRAINING_IDEAS.md`
