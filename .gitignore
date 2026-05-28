@@ -1,6 +1,7 @@
 .DS_Store
 *.tmp
 *.log
+/output/
 
 # Local course/material files that should not be published with the project repo.
 /material/

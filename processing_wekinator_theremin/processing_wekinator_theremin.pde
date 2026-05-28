@@ -15,6 +15,9 @@ final int PROCESSING_LISTEN_PORT = 12000;
 final int INPUT_MOUSE = 0;
 final int INPUT_MOTION = 1;
 final int INPUT_EYES = 2;
+final int PITCH_CONTINUOUS = 0;
+final int PITCH_PENTATONIC = 1;
+final int PITCH_ODE_TO_JOY = 2;
 
 Capture camera;
 OscP5 oscP5;
@@ -36,8 +39,10 @@ float motionThreshold = 38;
 int motionPixels = 0;
 float eyeDarkOffset = 32;
 int eyeDarkPixels = 0;
-float eyeSensitivity = 4.2;
-float eyeDeadZone = 0.018;
+float eyeSensitivityX = 4.2;
+float eyeSensitivityY = 8.0;
+float eyeDeadZoneX = 0.018;
+float eyeDeadZoneY = 0.010;
 float eyeRawX = 0.5;
 float eyeRawY = 0.5;
 float eyeCenterX = 0.5;
@@ -46,9 +51,9 @@ boolean eyeCalibrated = false;
 boolean requestEyeCalibration = false;
 
 float eyeRoiX = 0.22;
-float eyeRoiY = 0.16;
+float eyeRoiY = 0.18;
 float eyeRoiW = 0.56;
-float eyeRoiH = 0.28;
+float eyeRoiH = 0.22;
 
 float inputPitch = 0.5;
 float inputVolume = 0.0;
@@ -64,7 +69,9 @@ float smoothVolume = 0.0;
 
 boolean muted = true;
 boolean useWekinator = false;
-boolean quantizePitch = false;
+int pitchMode = PITCH_CONTINUOUS;
+int currentMidiNote = -1;
+int currentMelodyIndex = -1;
 boolean sendToWekinator = true;
 boolean testTone = false;
 int oscSentCount = 0;
@@ -79,6 +86,13 @@ int[] pentatonicMidi = {
   48, 50, 52, 55, 57,
   60, 62, 64, 67, 69,
   72, 74, 76, 79, 81
+};
+
+int[] odeToJoyMidi = {
+  64, 64, 65, 67, 67, 65, 64, 62,
+  60, 60, 62, 64, 64, 62, 62,
+  64, 64, 65, 67, 67, 65, 64, 62,
+  60, 60, 62, 64, 62, 60, 60
 };
 
 void setup() {
@@ -304,8 +318,8 @@ void updateEyeHand() {
       requestEyeCalibration = false;
     }
 
-    float gazeX = 0.5 + applyDeadZone(eyeRawX - eyeCenterX, eyeDeadZone) * eyeSensitivity;
-    float gazeY = 0.5 + applyDeadZone(eyeRawY - eyeCenterY, eyeDeadZone) * eyeSensitivity;
+    float gazeX = 0.5 + applyDeadZone(eyeRawX - eyeCenterX, eyeDeadZoneX) * eyeSensitivityX;
+    float gazeY = 0.5 + applyDeadZone(eyeRawY - eyeCenterY, eyeDeadZoneY) * eyeSensitivityY;
 
     rawHandX = map(constrain(gazeX, 0, 1), 0, 1, 80, width - 80);
     rawHandY = map(constrain(gazeY, 0, 1), 0, 1, 95, height - 115);
@@ -376,11 +390,22 @@ void oscEvent(OscMessage msg) {
 
 float pitchToFrequency(float value) {
   value = constrain(value, 0, 1);
+  currentMidiNote = -1;
+  currentMelodyIndex = -1;
 
-  if (quantizePitch) {
+  if (pitchMode == PITCH_PENTATONIC) {
     int index = int(round(value * (pentatonicMidi.length - 1)));
     index = constrain(index, 0, pentatonicMidi.length - 1);
-    return midiToFrequency(pentatonicMidi[index]);
+    currentMidiNote = pentatonicMidi[index];
+    return midiToFrequency(currentMidiNote);
+  }
+
+  if (pitchMode == PITCH_ODE_TO_JOY) {
+    int index = int(round(value * (odeToJoyMidi.length - 1)));
+    index = constrain(index, 0, odeToJoyMidi.length - 1);
+    currentMelodyIndex = index;
+    currentMidiNote = odeToJoyMidi[index];
+    return midiToFrequency(currentMidiNote);
   }
 
   return minFreq * pow(maxFreq / minFreq, value);
@@ -390,13 +415,41 @@ float midiToFrequency(int midiNote) {
   return 440.0 * pow(2.0, (midiNote - 69) / 12.0);
 }
 
+String pitchModeLabel() {
+  if (pitchMode == PITCH_PENTATONIC) {
+    return "pentatonic";
+  }
+  if (pitchMode == PITCH_ODE_TO_JOY) {
+    return "ode to joy";
+  }
+  return "continuous";
+}
+
+String currentPitchNoteLabel() {
+  if (currentMidiNote < 0) {
+    return "";
+  }
+  if (pitchMode == PITCH_ODE_TO_JOY) {
+    return " / Note: " + midiNoteName(currentMidiNote) + " (" + (currentMelodyIndex + 1) + "/" + odeToJoyMidi.length + ")";
+  }
+  return " / Note: " + midiNoteName(currentMidiNote);
+}
+
+String midiNoteName(int midiNote) {
+  String[] names = {
+    "C", "C#", "D", "D#", "E", "F",
+    "F#", "G", "G#", "A", "A#", "B"
+  };
+  return names[midiNote % 12] + str((midiNote / 12) - 1);
+}
+
 void keyPressed() {
   if (key == 'm' || key == 'M') {
     muted = !muted;
   } else if (key == 'w' || key == 'W') {
     useWekinator = !useWekinator;
   } else if (key == 'q' || key == 'Q') {
-    quantizePitch = !quantizePitch;
+    pitchMode = (pitchMode + 1) % 3;
   } else if (key == 's' || key == 'S') {
     sendToWekinator = !sendToWekinator;
   } else if (key == 't' || key == 'T') {
@@ -418,26 +471,35 @@ void keyPressed() {
     if (inputMode == INPUT_EYES) {
       requestEyeCalibration = true;
     }
-  } else if (key == '[') {
+  } else if (key == 'g' || key == 'G') {
+    adjustSensorSensitivity(1);
+  } else if (key == 'f' || key == 'F') {
+    adjustSensorSensitivity(-1);
+  } else if (key == 'y' || key == 'Y') {
     if (inputMode == INPUT_EYES) {
-      eyeSensitivity = max(1.2, eyeSensitivity - 0.4);
-    } else {
-      motionThreshold = max(8, motionThreshold - 4);
+      eyeSensitivityY = min(16.0, eyeSensitivityY + 0.8);
     }
-  } else if (key == ']') {
+  } else if (key == 'h' || key == 'H') {
     if (inputMode == INPUT_EYES) {
-      eyeSensitivity = min(10.0, eyeSensitivity + 0.4);
-    } else {
-      motionThreshold = min(95, motionThreshold + 4);
+      eyeSensitivityY = max(1.6, eyeSensitivityY - 0.8);
     }
-  } else if (key == '-' || key == '_') {
-    if (inputMode == INPUT_EYES) {
-      eyeDarkOffset = max(8, eyeDarkOffset - 4);
-    }
-  } else if (key == '=' || key == '+') {
+  } else if (key == 'd' || key == 'D') {
     if (inputMode == INPUT_EYES) {
       eyeDarkOffset = min(80, eyeDarkOffset + 4);
     }
+  } else if (key == 'a' || key == 'A') {
+    if (inputMode == INPUT_EYES) {
+      eyeDarkOffset = max(8, eyeDarkOffset - 4);
+    }
+  }
+}
+
+void adjustSensorSensitivity(float direction) {
+  if (inputMode == INPUT_EYES) {
+    eyeSensitivityX = constrain(eyeSensitivityX + direction * 0.4, 1.2, 12.0);
+    eyeSensitivityY = constrain(eyeSensitivityY + direction * 0.8, 1.6, 16.0);
+  } else if (inputMode == INPUT_MOTION) {
+    motionThreshold = constrain(motionThreshold - direction * 4, 8, 95);
   }
 }
 
@@ -703,7 +765,8 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   String mode = useWekinator ? "WEKINATOR" : "DIRECT PREVIEW";
   String live = wekinatorIsLive ? "receiving" : "waiting";
   String muteText = muted ? "muted" : "sound on";
-  String quantizeText = quantizePitch ? "pentatonic" : "continuous";
+  String pitchText = pitchModeLabel();
+  String noteText = currentPitchNoteLabel();
   String sendText = sendToWekinator ? "sending" : "paused";
   String testText = testTone ? " / TEST TONE" : "";
   String inputText = inputModeLabel();
@@ -712,15 +775,15 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   }
   String cameraText = cameraAvailable ? "camera on" : "camera off";
   String sensorText = inputMode == INPUT_EYES
-    ? "eye gain: " + nf(eyeSensitivity, 1, 1) + " / dark: " + int(eyeDarkOffset) + " / pixels: " + eyeDarkPixels
+    ? "eye gain X/Y: " + nf(eyeSensitivityX, 1, 1) + "/" + nf(eyeSensitivityY, 1, 1) + " / dark: " + int(eyeDarkOffset) + " / pixels: " + eyeDarkPixels
     : "motion: " + motionPixels + " / threshold: " + int(motionThreshold);
 
   fill(255);
   text("Mode: " + mode + " / " + live + testText, 24, height - 126);
-  text("Sound: " + muteText + " / Pitch: " + quantizeText + " / OSC: " + sendText, 24, height - 104);
+  text("Sound: " + muteText + " / Pitch: " + pitchText + noteText + " / OSC: " + sendText, 24, height - 104);
   text("Freq: " + int(freq) + " Hz / Amp: " + nf(amp, 1, 3) + " / Sent: " + oscSentCount, 24, height - 82);
   text("Input: " + inputText + " / " + cameraText + " / " + sensorText, 24, height - 60);
-  text("Keys: C input, E/R calibrate eyes, [ ] gain, -/+ eye dark, W Wekinator, Q quantize", 24, height - 34);
+  text("Keys: C input, E/R eyes, F/G sensitivity, H/Y vertical, A/D eye dark, W Wekinator, Q pitch", 24, height - 34);
 
   textAlign(RIGHT, TOP);
   fill(190);

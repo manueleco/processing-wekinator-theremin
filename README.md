@@ -66,14 +66,27 @@ Meaning of the outputs:
 - `C`: switch input mode, mouse hand / camera motion / eye motion.
 - `M`: mute / unmute.
 - `W`: direct preview / Wekinator mode.
-- `Q`: continuous pitch / pentatonic pitch.
+- `Q`: continuous pitch / pentatonic pitch / Ode to Joy pitch.
 - `T`: test tone.
 - `E`: calibrate eye center while looking straight ahead.
 - `R`: recalibrate camera motion background, or eye center in eye mode.
 - `V`: mirror camera.
-- `[` and `]`: adjust motion threshold.
-  In eye mode, these adjust gaze gain/sensitivity instead.
-- `-` and `+`: adjust dark-pixel threshold in eye mode.
+- `F` and `G`: decrease / increase sensor sensitivity.
+  In camera motion mode this changes the motion threshold. In eye mode this changes gaze gain.
+- `H` and `Y`: decrease / increase vertical gaze gain in eye mode.
+- `A` and `D`: decrease / increase dark-pixel threshold in eye mode.
+
+## Ode to Joy Pitch Mode
+
+Press `Q` until the HUD says `Pitch: ode to joy`.
+
+In this mode, the pitch axis does not play arbitrary continuous frequencies. Instead, it steps through a simplified first phrase of Beethoven's `Ode to Joy`:
+
+`E E F G G F E D C C D E E D D`
+
+This gives the instrument a hidden performance objective: move the virtual hand or gaze from left to right to discover and reproduce the melody, while using distance from the volume loop for dynamics.
+
+The Wekinator model can still control this mode. That means the learned gesture mapping chooses the melody step and volume, while Processing constrains the sound to the selected musical material.
 
 ## Training Example
 
@@ -119,8 +132,9 @@ To try it:
 4. Make sure your eyes are inside the yellow `eye region`.
 5. Look straight ahead and press `E` or `R` to calibrate the center.
 6. Look left, right, up, and down. The theremin hand should move in the same direction.
-7. Use `[` and `]` to increase or decrease gaze sensitivity.
-8. Use `-` and `+` if the dark-pixel count is too high or too low.
+7. Use `G` to increase gaze sensitivity, or `F` to decrease it.
+8. Use `Y` to increase vertical gaze gain, or `H` to decrease it.
+9. Use `A` and `D` if the dark-pixel count is too high or too low.
 
 In the eye region overlay:
 
