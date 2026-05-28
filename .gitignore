@@ -1,0 +1,16 @@
+.DS_Store
+*.tmp
+*.log
+
+# Local course/material files that should not be published with the project repo.
+/material/
+/codex-personality.md
+
+# Local prototypes kept during development. The polished sketch is in
+# processing_wekinator_theremin/.
+/theremin_wekinator_mouse/
+/theremin_wekinator_camera/
+
+# Local Wekinator training/project exports saved during testing.
+/processing_wekinator_theremin/theremin_wekinator_mouse/
+*.wekproj
