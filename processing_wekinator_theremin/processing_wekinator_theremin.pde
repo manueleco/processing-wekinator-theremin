@@ -36,6 +36,14 @@ float motionThreshold = 38;
 int motionPixels = 0;
 float eyeDarkOffset = 32;
 int eyeDarkPixels = 0;
+float eyeSensitivity = 4.2;
+float eyeDeadZone = 0.018;
+float eyeRawX = 0.5;
+float eyeRawY = 0.5;
+float eyeCenterX = 0.5;
+float eyeCenterY = 0.5;
+boolean eyeCalibrated = false;
+boolean requestEyeCalibration = false;
 
 float eyeRoiX = 0.22;
 float eyeRoiY = 0.16;
@@ -143,6 +151,7 @@ void updateMouseHand() {
   handConfidence = 1;
   motionPixels = 0;
   eyeDarkPixels = 0;
+  eyeCalibrated = false;
   handX = lerp(handX, rawHandX, 0.25);
   handY = lerp(handY, rawHandY, 0.25);
 }
@@ -285,9 +294,21 @@ void updateEyeHand() {
     float nx = constrain((cx - x0) / max(1.0f, float(x1 - x0)), 0, 1);
     float ny = constrain((cy - y0) / max(1.0f, float(y1 - y0)), 0, 1);
 
-    float screenX = map(nx, 0, 1, 80, width - 80);
-    rawHandX = mirrorCamera ? width - screenX : screenX;
-    rawHandY = map(ny, 0, 1, 95, height - 115);
+    eyeRawX = mirrorCamera ? 1.0 - nx : nx;
+    eyeRawY = ny;
+
+    if (!eyeCalibrated || requestEyeCalibration) {
+      eyeCenterX = eyeRawX;
+      eyeCenterY = eyeRawY;
+      eyeCalibrated = true;
+      requestEyeCalibration = false;
+    }
+
+    float gazeX = 0.5 + applyDeadZone(eyeRawX - eyeCenterX, eyeDeadZone) * eyeSensitivity;
+    float gazeY = 0.5 + applyDeadZone(eyeRawY - eyeCenterY, eyeDeadZone) * eyeSensitivity;
+
+    rawHandX = map(constrain(gazeX, 0, 1), 0, 1, 80, width - 80);
+    rawHandY = map(constrain(gazeY, 0, 1), 0, 1, 95, height - 115);
     handConfidence = lerp(handConfidence, constrain(count / 190.0, 0.25, 1), 0.18);
   } else {
     handConfidence = lerp(handConfidence, 0, 0.035);
@@ -295,6 +316,18 @@ void updateEyeHand() {
 
   handX = lerp(handX, rawHandX, 0.18);
   handY = lerp(handY, rawHandY, 0.18);
+}
+
+float applyDeadZone(float value, float zone) {
+  if (abs(value) <= zone) {
+    return 0;
+  }
+
+  if (value > 0) {
+    return value - zone;
+  }
+
+  return value + zone;
 }
 
 float colorDifference(int a, int b) {
@@ -374,21 +407,36 @@ void keyPressed() {
       startCameraIfNeeded();
       resetMotionReference();
     }
+  } else if (key == 'e' || key == 'E') {
+    if (inputMode == INPUT_EYES) {
+      requestEyeCalibration = true;
+    }
   } else if (key == 'r' || key == 'R') {
     resetMotionReference();
   } else if (key == 'v' || key == 'V') {
     mirrorCamera = !mirrorCamera;
+    if (inputMode == INPUT_EYES) {
+      requestEyeCalibration = true;
+    }
   } else if (key == '[') {
     if (inputMode == INPUT_EYES) {
-      eyeDarkOffset = max(8, eyeDarkOffset - 4);
+      eyeSensitivity = max(1.2, eyeSensitivity - 0.4);
     } else {
       motionThreshold = max(8, motionThreshold - 4);
     }
   } else if (key == ']') {
     if (inputMode == INPUT_EYES) {
-      eyeDarkOffset = min(80, eyeDarkOffset + 4);
+      eyeSensitivity = min(10.0, eyeSensitivity + 0.4);
     } else {
       motionThreshold = min(95, motionThreshold + 4);
+    }
+  } else if (key == '-' || key == '_') {
+    if (inputMode == INPUT_EYES) {
+      eyeDarkOffset = max(8, eyeDarkOffset - 4);
+    }
+  } else if (key == '=' || key == '+') {
+    if (inputMode == INPUT_EYES) {
+      eyeDarkOffset = min(80, eyeDarkOffset + 4);
     }
   }
 }
@@ -400,6 +448,9 @@ void mousePressed() {
 void resetMotionReference() {
   if (inputMode == INPUT_MOTION || inputMode == INPUT_EYES) {
     startCameraIfNeeded();
+  }
+  if (inputMode == INPUT_EYES) {
+    requestEyeCalibration = true;
   }
   if (cameraAvailable && camera != null && camera.pixels != null && camera.pixels.length > 0) {
     camera.loadPixels();
@@ -469,6 +520,20 @@ void drawEyeRoiOverlay() {
   textAlign(LEFT, BOTTOM);
   textSize(13);
   text("eye region", x + 8, y - 6);
+
+  float rawX = x + eyeRawX * w;
+  float rawY = y + eyeRawY * h;
+  float centerX = x + eyeCenterX * w;
+  float centerY = y + eyeCenterY * h;
+
+  stroke(255, 194, 80, 170);
+  strokeWeight(1);
+  line(centerX - 12, centerY, centerX + 12, centerY);
+  line(centerX, centerY - 12, centerX, centerY + 12);
+
+  noStroke();
+  fill(88, 205, 255, 220);
+  ellipse(rawX, rawY, 10, 10);
 }
 
 float pitchAntennaX() {
@@ -647,7 +712,7 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   }
   String cameraText = cameraAvailable ? "camera on" : "camera off";
   String sensorText = inputMode == INPUT_EYES
-    ? "eye dark pixels: " + eyeDarkPixels + " / offset: " + int(eyeDarkOffset)
+    ? "eye gain: " + nf(eyeSensitivity, 1, 1) + " / dark: " + int(eyeDarkOffset) + " / pixels: " + eyeDarkPixels
     : "motion: " + motionPixels + " / threshold: " + int(motionThreshold);
 
   fill(255);
@@ -655,7 +720,7 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   text("Sound: " + muteText + " / Pitch: " + quantizeText + " / OSC: " + sendText, 24, height - 104);
   text("Freq: " + int(freq) + " Hz / Amp: " + nf(amp, 1, 3) + " / Sent: " + oscSentCount, 24, height - 82);
   text("Input: " + inputText + " / " + cameraText + " / " + sensorText, 24, height - 60);
-  text("Keys: C input, click or M sound, R recalibrate, V mirror, [ ] sensitivity, W Wekinator, Q quantize", 24, height - 34);
+  text("Keys: C input, E/R calibrate eyes, [ ] gain, -/+ eye dark, W Wekinator, Q quantize", 24, height - 34);
 
   textAlign(RIGHT, TOP);
   fill(190);
@@ -664,6 +729,9 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   text("motion confidence: " + nf(handConfidence, 1, 2), width - 24, 66);
   text("weki pitch: " + nf(wekiPitch, 1, 2), width - 24, 88);
   text("weki volume: " + nf(wekiVolume, 1, 2), width - 24, 110);
+  if (inputMode == INPUT_EYES) {
+    text("eye raw: " + nf(eyeRawX, 1, 2) + ", " + nf(eyeRawY, 1, 2), width - 24, 132);
+  }
 }
 
 String inputModeLabel() {

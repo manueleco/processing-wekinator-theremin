@@ -68,10 +68,12 @@ Meaning of the outputs:
 - `W`: direct preview / Wekinator mode.
 - `Q`: continuous pitch / pentatonic pitch.
 - `T`: test tone.
-- `R`: recalibrate camera motion background.
+- `E`: calibrate eye center while looking straight ahead.
+- `R`: recalibrate camera motion background, or eye center in eye mode.
 - `V`: mirror camera.
 - `[` and `]`: adjust motion threshold.
-  In eye mode, these adjust dark-pixel sensitivity instead.
+  In eye mode, these adjust gaze gain/sensitivity instead.
+- `-` and `+`: adjust dark-pixel threshold in eye mode.
 
 ## Training Example
 
@@ -115,8 +117,15 @@ To try it:
 2. Sit close to the MacBook camera.
 3. Keep your face mostly still.
 4. Make sure your eyes are inside the yellow `eye region`.
-5. Look left, right, up, and down.
-6. Use `[` and `]` if the dark-pixel count is too high or too low.
+5. Look straight ahead and press `E` or `R` to calibrate the center.
+6. Look left, right, up, and down. The theremin hand should move in the same direction.
+7. Use `[` and `]` to increase or decrease gaze sensitivity.
+8. Use `-` and `+` if the dark-pixel count is too high or too low.
+
+In the eye region overlay:
+
+- The yellow cross is the calibrated center.
+- The blue dot is the current dark-pixel eye estimate.
 
 This works best with good frontal light and without strong reflections on glasses.
 
