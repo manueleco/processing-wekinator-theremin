@@ -17,8 +17,9 @@ final int INPUT_MOUSE = 0;
 final int INPUT_MOTION = 1;
 final int INPUT_EYES = 2;
 final int PITCH_CONTINUOUS = 0;
-final int PITCH_PENTATONIC = 1;
-final int PITCH_ODE_TO_JOY = 2;
+final int PITCH_CHROMATIC = 1;
+final int PITCH_PENTATONIC = 2;
+final int PITCH_ODE_TO_JOY = 3;
 
 Capture camera;
 OscP5 oscP5;
@@ -97,6 +98,8 @@ float maxFreq = 1400.0;
 float masterGain = 0.35;
 float pitchRange = 430.0;
 float volumeRange = 390.0;
+int chromaticMinMidi = 48;
+int chromaticMaxMidi = 84;
 
 int[] pentatonicMidi = {
   48, 50, 52, 55, 57,
@@ -463,6 +466,12 @@ float pitchToFrequency(float value) {
     return midiToFrequency(currentMidiNote);
   }
 
+  if (pitchMode == PITCH_CHROMATIC) {
+    currentMidiNote = int(round(map(value, 0, 1, chromaticMinMidi, chromaticMaxMidi)));
+    currentMidiNote = constrain(currentMidiNote, chromaticMinMidi, chromaticMaxMidi);
+    return midiToFrequency(currentMidiNote);
+  }
+
   if (pitchMode == PITCH_ODE_TO_JOY) {
     int index = int(round(value * (odeToJoyMidi.length - 1)));
     index = constrain(index, 0, odeToJoyMidi.length - 1);
@@ -479,6 +488,9 @@ float midiToFrequency(int midiNote) {
 }
 
 String pitchModeLabel() {
+  if (pitchMode == PITCH_CHROMATIC) {
+    return "chromatic";
+  }
   if (pitchMode == PITCH_PENTATONIC) {
     return "pentatonic";
   }
@@ -512,7 +524,7 @@ void keyPressed() {
   } else if (key == 'w' || key == 'W') {
     useWekinator = !useWekinator;
   } else if (key == 'q' || key == 'Q') {
-    pitchMode = (pitchMode + 1) % 3;
+    pitchMode = (pitchMode + 1) % 4;
   } else if (key == 's' || key == 'S') {
     sendToWekinator = !sendToWekinator;
   } else if (key == 'x' || key == 'X') {

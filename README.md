@@ -109,7 +109,7 @@ This gives Wekinator a stronger role: it learns how to convert noisy movement fe
 - `M`: mute / unmute.
 - `W`: direct preview / Wekinator mode.
 - `X`: switch Wekinator OSC profile, basic 2x2 / expressive 6x4.
-- `Q`: continuous pitch / pentatonic pitch / Ode to Joy pitch.
+- `Q`: continuous pitch / chromatic pitch / pentatonic pitch / Ode to Joy pitch.
 - `T`: test tone.
 - `E`: calibrate eye center while looking straight ahead.
 - `R`: recalibrate camera motion background, or eye center in eye mode.
@@ -118,6 +118,22 @@ This gives Wekinator a stronger role: it learns how to convert noisy movement fe
   In camera motion mode this changes the motion threshold. In eye mode this changes gaze gain.
 - `H` and `Y`: decrease / increase vertical gaze gain in eye mode.
 - `A` and `D`: decrease / increase dark-pixel threshold in eye mode.
+
+## Chromatic Pitch Mode
+
+Press `Q` until the HUD says `Pitch: chromatic`.
+
+In this mode, the pitch axis snaps to precise chromatic MIDI notes instead of producing arbitrary continuous frequencies. This makes the instrument more musically controlled while still allowing expressive movement.
+
+The current chromatic range is:
+
+```text
+C3 to C6
+```
+
+The HUD shows the current note name, for example `C4`, `F#4`, or `A5`.
+
+This is the best mode when the goal is accurate notes rather than free theremin glissando.
 
 ## Ode to Joy Pitch Mode
 

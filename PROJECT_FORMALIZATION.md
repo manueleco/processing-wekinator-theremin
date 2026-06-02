@@ -166,6 +166,25 @@ movement -> Wekinator pitch output -> melody step -> note
 
 This can be presented as a playful melody-training system. The user tries to control movement well enough to reproduce a recognizable phrase.
 
+## Pitch Precision and Quantization
+
+The project includes different pitch modes for different musical goals.
+
+| Pitch mode | Purpose |
+| --- | --- |
+| continuous | preserves the free glissando behavior of a traditional theremin |
+| chromatic | snaps movement to precise semitone notes from `C3` to `C6` |
+| pentatonic | constrains notes to a friendly improvisation scale |
+| Ode to Joy | maps movement to the steps of a known melody |
+
+The chromatic mode is important because it makes the instrument more functional as a musical controller. Instead of generating arbitrary frequencies, the pitch output is converted into exact MIDI notes.
+
+```text
+Wekinator pitch prediction -> chromatic MIDI note -> precise frequency
+```
+
+This makes the system easier to evaluate because the user can aim for recognizable notes rather than uncontrolled pitch values.
+
 ## Health, Education, and Accessibility Justification
 
 The project can be framed as more than a music toy.
@@ -270,4 +289,3 @@ Future research extension:
 ```text
 Explore TinyML deployment so a simplified trained model can run directly on embedded hardware.
 ```
-
