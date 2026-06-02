@@ -4,11 +4,12 @@ import netP5.*;
 import processing.sound.*;
 
 // Virtual antenna theremin for MacBook Pro.
-// Processing -> Wekinator: /wek/inputs, 2 floats, localhost:6448
-//   input 1 = hand proximity to pitch antenna
-//   input 2 = hand distance from volume loop
-// Wekinator -> Processing: /wek/outputs, 2 floats, localhost:12000
-//   output 1 = pitch, output 2 = volume
+// Processing -> Wekinator: /wek/inputs, localhost:6448
+//   basic profile: 2 inputs = pitch proximity, volume loop distance
+//   expressive profile: 6 inputs = pitch, volume, speed, acceleration, confidence, noise
+// Wekinator -> Processing: /wek/outputs, localhost:12000
+//   basic profile: 2 outputs = pitch, volume
+//   expressive profile: 4 outputs = pitch, volume, vibrato, timbre brightness
 
 final int WEKINATOR_INPUT_PORT = 6448;
 final int PROCESSING_LISTEN_PORT = 12000;
@@ -23,6 +24,7 @@ Capture camera;
 OscP5 oscP5;
 NetAddress wekinator;
 SinOsc theremin;
+SawOsc timbreOsc;
 
 int[] previousPixels;
 boolean cameraAvailable = false;
@@ -35,6 +37,13 @@ float handY = 280;
 float rawHandX = 450;
 float rawHandY = 280;
 float handConfidence = 0;
+float previousHandX = 450;
+float previousHandY = 280;
+float previousInstantSpeed = 0;
+float movementSpeed = 0;
+float movementAcceleration = 0;
+float sensorNoise = 0;
+float expressionEnergy = 0;
 float motionThreshold = 38;
 int motionPixels = 0;
 float eyeDarkOffset = 32;
@@ -59,6 +68,8 @@ float inputPitch = 0.5;
 float inputVolume = 0.0;
 float wekiPitch = 0.5;
 float wekiVolume = 0.0;
+float wekiVibrato = 0.0;
+float wekiBrightness = 0.0;
 boolean gotWekinatorOutput = false;
 int lastWekinatorMillis = -9999;
 
@@ -66,6 +77,10 @@ float targetPitch = 0.5;
 float targetVolume = 0.0;
 float smoothPitch = 0.5;
 float smoothVolume = 0.0;
+float targetVibrato = 0.0;
+float targetBrightness = 0.0;
+float smoothVibrato = 0.0;
+float smoothBrightness = 0.0;
 
 boolean muted = true;
 boolean useWekinator = false;
@@ -73,6 +88,7 @@ int pitchMode = PITCH_CONTINUOUS;
 int currentMidiNote = -1;
 int currentMelodyIndex = -1;
 boolean sendToWekinator = true;
+boolean expressiveWekinator = false;
 boolean testTone = false;
 int oscSentCount = 0;
 
@@ -107,6 +123,10 @@ void setup() {
   theremin.play();
   theremin.amp(0);
 
+  timbreOsc = new SawOsc(this);
+  timbreOsc.play();
+  timbreOsc.amp(0);
+
   textFont(createFont("Arial", 16));
 }
 
@@ -119,28 +139,45 @@ void draw() {
   }
 
   boolean wekinatorIsLive = gotWekinatorOutput && millis() - lastWekinatorMillis < 1500;
+  float directVibrato = constrain(expressionEnergy * 0.95, 0, 1);
+  float directBrightness = constrain(inputPitch * 0.30 + movementSpeed * 0.70, 0, 1) * handConfidence;
 
   if (useWekinator && wekinatorIsLive) {
     targetPitch = constrain(wekiPitch, 0, 1);
     targetVolume = constrain(wekiVolume, 0, 1) * handConfidence;
+    targetVibrato = expressiveWekinator ? constrain(wekiVibrato, 0, 1) * handConfidence : directVibrato;
+    targetBrightness = expressiveWekinator ? constrain(wekiBrightness, 0, 1) * handConfidence : directBrightness;
   } else {
     targetPitch = inputPitch;
     targetVolume = inputVolume * handConfidence;
+    targetVibrato = directVibrato;
+    targetBrightness = directBrightness;
   }
 
   if (testTone) {
     targetPitch = 0.45;
     targetVolume = 0.8;
+    targetVibrato = 0.18;
+    targetBrightness = 0.18;
   }
 
   smoothPitch = lerp(smoothPitch, targetPitch, 0.12);
   smoothVolume = lerp(smoothVolume, muted ? 0 : targetVolume, 0.10);
+  smoothVibrato = lerp(smoothVibrato, muted ? 0 : targetVibrato, 0.10);
+  smoothBrightness = lerp(smoothBrightness, muted ? 0 : targetBrightness, 0.10);
 
-  float freq = pitchToFrequency(smoothPitch);
+  float baseFreq = pitchToFrequency(smoothPitch);
+  float vibratoRate = map(smoothVibrato, 0, 1, 4.0, 8.5);
+  float vibratoDepthSemitones = map(smoothVibrato, 0, 1, 0.0, 0.85);
+  float vibratoSemitones = sin(frameCount * 0.08 * vibratoRate) * vibratoDepthSemitones;
+  float freq = baseFreq * pow(2.0, vibratoSemitones / 12.0);
   float amp = pow(constrain(smoothVolume, 0, 1), 1.35) * masterGain;
+  float timbreMix = constrain(smoothBrightness, 0, 1);
 
   theremin.freq(freq);
-  theremin.amp(amp);
+  theremin.amp(amp * (1.0 - timbreMix * 0.42));
+  timbreOsc.freq(freq);
+  timbreOsc.amp(amp * timbreMix * 0.22);
 
   drawTheremin(freq, amp, wekinatorIsLive);
 }
@@ -367,12 +404,32 @@ void updateInputs() {
 
   float loopDistance = dist(handX, handY, volumeLoopX(), volumeLoopY());
   inputVolume = constrain((loopDistance - 35.0) / volumeRange, 0, 1);
+
+  float dx = handX - previousHandX;
+  float dy = handY - previousHandY;
+  float instantSpeed = constrain(sqrt(dx * dx + dy * dy) / 80.0, 0, 1);
+  float instantAcceleration = constrain(abs(instantSpeed - previousInstantSpeed) * 4.0, 0, 1);
+
+  movementSpeed = lerp(movementSpeed, instantSpeed, 0.22);
+  movementAcceleration = lerp(movementAcceleration, instantAcceleration, 0.22);
+  sensorNoise = lerp(sensorNoise, constrain(abs(instantSpeed - movementSpeed) * 3.5 + (1.0 - handConfidence) * 0.35, 0, 1), 0.18);
+  expressionEnergy = constrain((movementSpeed * 0.65 + movementAcceleration * 0.35) * handConfidence, 0, 1);
+
+  previousHandX = handX;
+  previousHandY = handY;
+  previousInstantSpeed = instantSpeed;
 }
 
 void sendOscToWekinator() {
   OscMessage msg = new OscMessage("/wek/inputs");
   msg.add(inputPitch);
   msg.add(inputVolume);
+  if (expressiveWekinator) {
+    msg.add(movementSpeed);
+    msg.add(movementAcceleration);
+    msg.add(handConfidence);
+    msg.add(sensorNoise);
+  }
   oscP5.send(msg, wekinator);
   oscSentCount++;
 }
@@ -382,6 +439,12 @@ void oscEvent(OscMessage msg) {
     wekiPitch = msg.get(0).floatValue();
     if (msg.typetag().length() >= 2) {
       wekiVolume = msg.get(1).floatValue();
+    }
+    if (msg.typetag().length() >= 3) {
+      wekiVibrato = msg.get(2).floatValue();
+    }
+    if (msg.typetag().length() >= 4) {
+      wekiBrightness = msg.get(3).floatValue();
     }
     gotWekinatorOutput = true;
     lastWekinatorMillis = millis();
@@ -452,6 +515,9 @@ void keyPressed() {
     pitchMode = (pitchMode + 1) % 3;
   } else if (key == 's' || key == 'S') {
     sendToWekinator = !sendToWekinator;
+  } else if (key == 'x' || key == 'X') {
+    expressiveWekinator = !expressiveWekinator;
+    gotWekinatorOutput = false;
   } else if (key == 't' || key == 'T') {
     testTone = !testTone;
   } else if (key == 'c' || key == 'C') {
@@ -765,6 +831,7 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   String mode = useWekinator ? "WEKINATOR" : "DIRECT PREVIEW";
   String live = wekinatorIsLive ? "receiving" : "waiting";
   String muteText = muted ? "muted" : "sound on";
+  String profileText = wekinatorProfileLabel();
   String pitchText = pitchModeLabel();
   String noteText = currentPitchNoteLabel();
   String sendText = sendToWekinator ? "sending" : "paused";
@@ -777,13 +844,19 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   String sensorText = inputMode == INPUT_EYES
     ? "eye gain X/Y: " + nf(eyeSensitivityX, 1, 1) + "/" + nf(eyeSensitivityY, 1, 1) + " / dark: " + int(eyeDarkOffset) + " / pixels: " + eyeDarkPixels
     : "motion: " + motionPixels + " / threshold: " + int(motionThreshold);
+  String expressiveText = "speed: " + nf(movementSpeed, 1, 2)
+    + " / accel: " + nf(movementAcceleration, 1, 2)
+    + " / noise: " + nf(sensorNoise, 1, 2)
+    + " / vib: " + nf(smoothVibrato, 1, 2)
+    + " / bright: " + nf(smoothBrightness, 1, 2);
 
   fill(255);
-  text("Mode: " + mode + " / " + live + testText, 24, height - 126);
-  text("Sound: " + muteText + " / Pitch: " + pitchText + noteText + " / OSC: " + sendText, 24, height - 104);
-  text("Freq: " + int(freq) + " Hz / Amp: " + nf(amp, 1, 3) + " / Sent: " + oscSentCount, 24, height - 82);
-  text("Input: " + inputText + " / " + cameraText + " / " + sensorText, 24, height - 60);
-  text("Keys: C input, E/R eyes, F/G sensitivity, H/Y vertical, A/D eye dark, W Wekinator, Q pitch", 24, height - 34);
+  text("Mode: " + mode + " / " + live + testText, 24, height - 154);
+  text("Sound: " + muteText + " / Pitch: " + pitchText + noteText, 24, height - 132);
+  text("Freq: " + int(freq) + " Hz / Amp: " + nf(amp, 1, 3) + " / OSC: " + sendText + " / " + profileText + " / Sent: " + oscSentCount, 24, height - 110);
+  text("Input: " + inputText + " / " + cameraText + " / " + sensorText, 24, height - 82);
+  text("Expression: " + expressiveText, 24, height - 58);
+  text("Keys: C input, X profile, W Wekinator, Q pitch, F/G sens, H/Y vertical, A/D dark, E/R eyes", 24, height - 34);
 
   textAlign(RIGHT, TOP);
   fill(190);
@@ -792,9 +865,18 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   text("motion confidence: " + nf(handConfidence, 1, 2), width - 24, 66);
   text("weki pitch: " + nf(wekiPitch, 1, 2), width - 24, 88);
   text("weki volume: " + nf(wekiVolume, 1, 2), width - 24, 110);
+  text("weki vibrato: " + nf(wekiVibrato, 1, 2), width - 24, 132);
+  text("weki brightness: " + nf(wekiBrightness, 1, 2), width - 24, 154);
   if (inputMode == INPUT_EYES) {
-    text("eye raw: " + nf(eyeRawX, 1, 2) + ", " + nf(eyeRawY, 1, 2), width - 24, 132);
+    text("eye raw: " + nf(eyeRawX, 1, 2) + ", " + nf(eyeRawY, 1, 2), width - 24, 176);
   }
+}
+
+String wekinatorProfileLabel() {
+  if (expressiveWekinator) {
+    return "expressive OSC: 6 inputs / 4 outputs";
+  }
+  return "basic OSC: 2 inputs / 2 outputs";
 }
 
 String inputModeLabel() {

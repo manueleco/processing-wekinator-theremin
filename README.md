@@ -40,6 +40,8 @@ The mixed sketch imports `processing.video.*` at compile time, so the `Video Lib
 
 ## Wekinator Setup
 
+### Basic Profile
+
 Create a new Wekinator project:
 
 - Inputs: `2`
@@ -61,11 +63,52 @@ Meaning of the outputs:
 - Output 1: pitch, from `0.0` to `1.0`.
 - Output 2: volume, from `0.0` to `1.0`.
 
+### Expressive Profile
+
+The sketch also includes an optional expressive Wekinator profile. Press `X` in Processing to switch between:
+
+- `basic OSC: 2 inputs / 2 outputs`
+- `expressive OSC: 6 inputs / 4 outputs`
+
+For the expressive profile, create a Wekinator project with:
+
+- Inputs: `6`
+- Outputs: `4`
+- Output type: `All continuous`
+- Input OSC message: `/wek/inputs`
+- Input OSC port: `6448`
+- Output OSC message: `/wek/outputs`
+- Output host: `localhost`
+- Output port: `12000`
+
+Expressive inputs:
+
+| Input | Meaning |
+| ---: | --- |
+| 1 | pitch antenna proximity |
+| 2 | volume loop distance |
+| 3 | movement speed |
+| 4 | movement acceleration |
+| 5 | tracking confidence |
+| 6 | estimated sensor noise / instability |
+
+Expressive outputs:
+
+| Output | Meaning |
+| ---: | --- |
+| 1 | stabilized pitch or melody position |
+| 2 | stabilized volume |
+| 3 | vibrato amount |
+| 4 | timbre brightness |
+
+This gives Wekinator a stronger role: it learns how to convert noisy movement features into stable and expressive musical control.
+
 ## Controls
 
 - `C`: switch input mode, mouse hand / camera motion / eye motion.
 - `M`: mute / unmute.
 - `W`: direct preview / Wekinator mode.
+- `X`: switch Wekinator OSC profile, basic 2x2 / expressive 6x4.
 - `Q`: continuous pitch / pentatonic pitch / Ode to Joy pitch.
 - `T`: test tone.
 - `E`: calibrate eye center while looking straight ahead.
@@ -213,3 +256,7 @@ The direct mode shows a programmed mapping. The Wekinator mode shows a learned m
 For more possible AI training directions, see:
 
 `AI_TRAINING_IDEAS.md`
+
+For the more formal project framing and Arduino extension notes, see:
+
+`PROJECT_FORMALIZATION.md`
