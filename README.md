@@ -6,7 +6,7 @@ The sketch simulates a theremin with two virtual antennas:
 
 - A vertical pitch antenna on the right.
 - A volume loop on the left.
-- A virtual hand controlled by the mouse, camera motion detection, or experimental eye-motion detection.
+- A virtual hand controlled by the mouse, camera motion detection, experimental eye-motion detection, or optional Arduino distance sensing.
 
 Processing sends the virtual hand features to Wekinator through OSC. Wekinator learns a continuous mapping and sends back `pitch` and `volume`, which Processing turns into a sine-wave theremin sound and reactive visuals.
 
@@ -15,6 +15,10 @@ Processing sends the virtual hand features to Wekinator through OSC. Wekinator l
 Open this sketch in Processing:
 
 `processing_wekinator_theremin/processing_wekinator_theremin.pde`
+
+Optional Arduino sketch:
+
+`arduino/tof_single_sensor/tof_single_sensor.ino`
 
 ## Processing Libraries
 
@@ -69,6 +73,7 @@ The sketch also includes an optional expressive Wekinator profile. Press `X` in 
 
 - `basic OSC: 2 inputs / 2 outputs`
 - `expressive OSC: 6 inputs / 4 outputs`
+- `fusion OSC: 10 inputs / 4 outputs`
 
 For the expressive profile, create a Wekinator project with:
 
@@ -103,14 +108,56 @@ Expressive outputs:
 
 This gives Wekinator a stronger role: it learns how to convert noisy movement features into stable and expressive musical control.
 
+### Sensor-Fusion Profile
+
+Use this profile when Arduino distance sensing is connected. Press `X` until the HUD says:
+
+```text
+fusion OSC: 10 inputs / 4 outputs
+```
+
+Create a Wekinator project with:
+
+- Inputs: `10`
+- Outputs: `4`
+- Output type: `All continuous`
+- Input OSC message: `/wek/inputs`
+- Input OSC port: `6448`
+- Output OSC message: `/wek/outputs`
+- Output host: `localhost`
+- Output port: `12000`
+
+Fusion inputs:
+
+| Input | Meaning |
+| ---: | --- |
+| 1 | pitch antenna proximity |
+| 2 | volume loop distance |
+| 3 | movement speed |
+| 4 | movement acceleration |
+| 5 | tracking confidence |
+| 6 | camera/tracking noise |
+| 7 | Arduino pitch distance mapped to `0..1` |
+| 8 | Arduino volume distance mapped to `0..1` |
+| 9 | Arduino sensor speed |
+| 10 | Arduino sensor confidence |
+
+This profile lets Wekinator act as a sensor-fusion layer:
+
+```text
+camera/movement estimate + physical distance sensor -> stable expressive musical control
+```
+
 ## Controls
 
-- `C`: switch input mode, mouse hand / camera motion / eye motion.
+- `C`: switch input mode, mouse hand / camera motion / eye motion / Arduino sensor.
 - `M`: mute / unmute.
 - `W`: direct preview / Wekinator mode.
-- `X`: switch Wekinator OSC profile, basic 2x2 / expressive 6x4.
+- `X`: switch Wekinator OSC profile, basic 2x2 / expressive 6x4 / fusion 10x4.
 - `Q`: continuous pitch / chromatic pitch / pentatonic pitch / Ode to Joy pitch.
 - `T`: test tone.
+- `P`: practice/game mode.
+- `L`: start/stop CSV data logging for TensorFlow.
 - `E`: calibrate eye center while looking straight ahead.
 - `R`: recalibrate camera motion background, or eye center in eye mode.
 - `V`: mirror camera.
@@ -163,6 +210,72 @@ Record 1-2 seconds for each example in Wekinator:
 Then press `Train` and `Run` in Wekinator. In Processing, press `W` until the HUD says:
 
 `Mode: WEKINATOR / receiving`
+
+## Arduino Sensor Input
+
+The project can use an Arduino with a `VL53L1X` Time-of-Flight distance sensor.
+
+The Arduino sends:
+
+```text
+A,pitch_mm,volume_mm,confidence
+```
+
+For the current one-sensor prototype:
+
+```text
+A,320,-1,1.00
+```
+
+Steps:
+
+1. Upload `arduino/tof_single_sensor/tof_single_sensor.ino`.
+2. Close Arduino Serial Monitor so Processing can open the serial port.
+3. Run the Processing sketch.
+4. Press `C` until the HUD says `Input: arduino sensor`.
+5. Press `X` until the HUD says `fusion OSC: 10 inputs / 4 outputs`.
+
+See:
+
+`arduino/README.md`
+
+## Data Logging and TensorFlow
+
+Press `L` to start or stop CSV logging.
+
+CSV logs are saved under:
+
+```text
+processing_wekinator_theremin/data_logs/
+```
+
+Use number keys to label the current recording:
+
+```text
+0 free, 1 low, 2 middle, 3 high, 4 stable, 5 expressive, 6 noisy, 7 left, 8 right, 9 hold
+```
+
+Train the starter TensorFlow model with:
+
+```bash
+python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
+```
+
+See:
+
+`ml/README.md`
+
+## Practice Mode
+
+Press `P` to enable a first gamified exercise.
+
+The sketch switches to chromatic mode and asks the user to hit and hold target notes from `Ode to Joy`.
+
+This is the first step toward configurable music/physiotherapy-style exercises. A draft configuration lives in:
+
+```text
+config/exercises.json
+```
 
 ## MacBook Pro Camera Notes
 
@@ -276,3 +389,9 @@ For more possible AI training directions, see:
 For the more formal project framing and Arduino extension notes, see:
 
 `PROJECT_FORMALIZATION.md`
+
+Project tracking docs:
+
+- `PROCESS.md`
+- `DONE.md`
+- `FUTURE_WORK.md`

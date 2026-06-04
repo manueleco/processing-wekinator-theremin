@@ -133,6 +133,41 @@ Outputs:
 
 In Processing, press `X` to switch between the basic and expressive OSC profiles.
 
+### Sensor-Fusion Wekinator Profile
+
+Use this when Arduino distance sensing is connected.
+
+```text
+Inputs: 10
+Outputs: 4
+```
+
+Inputs:
+
+```text
+1. pitch antenna proximity
+2. volume loop distance
+3. movement speed
+4. movement acceleration
+5. tracking confidence
+6. camera/tracking noise
+7. Arduino pitch distance mapped to 0..1
+8. Arduino volume distance mapped to 0..1
+9. Arduino sensor speed
+10. Arduino sensor confidence
+```
+
+Outputs:
+
+```text
+1. corrected pitch
+2. corrected volume
+3. vibrato amount
+4. timbre brightness
+```
+
+This profile makes Wekinator useful as a real sensor-fusion model. It learns how to match camera/movement estimates with physical distance sensing and output a more stable musical control signal.
+
 ## Suggested Expressive Training Examples
 
 Record examples in Wekinator where the desired outputs reflect musical intention, not only physical position.
@@ -213,7 +248,11 @@ The project uses machine learning to adapt a musical interface to the user, tran
 
 ## Arduino and Physical Sensor Extension
 
-An Arduino can be integrated, especially with a distance sensor.
+An Arduino can be integrated, especially with a distance sensor. A first single-sensor sketch is included in:
+
+```text
+arduino/tof_single_sensor/tof_single_sensor.ino
+```
 
 Possible sensors:
 
@@ -236,6 +275,60 @@ Arduino sensor
 ```
 
 In this architecture, Arduino is the physical sensor layer, Processing is the communication and sound layer, and Wekinator is the machine-learning layer.
+
+The current serial format is:
+
+```text
+A,pitch_mm,volume_mm,confidence
+```
+
+This supports a one-sensor version immediately and a two-sensor version later.
+
+## Gamification and Rehabilitation-Style Exercises
+
+The project now includes a first practice mode. Press `P` in Processing to start a note-hold game based on `Ode to Joy`.
+
+The purpose is to turn musical control into a measurable task:
+
+```text
+target note -> controlled position -> hold stability -> score/progress
+```
+
+This can be extended toward physiotherapy-style exercises by configuring:
+
+- target positions
+- hold duration
+- movement range
+- repetition count
+- acceptable noise/tremor
+- rest intervals
+- progress scoring
+
+A draft exercise configuration exists in:
+
+```text
+config/exercises.json
+```
+
+This should be presented as an educational/wellness prototype, not a medical device.
+
+## Application Deliverable
+
+The most realistic final app deliverable is a Processing macOS export:
+
+```text
+Processing -> File -> Export Application
+```
+
+This keeps camera, sound, serial, and OSC support together. Wekinator would still run as a separate companion app for the course prototype.
+
+A future web version would require a partial rebuild:
+
+```text
+React + WebAudio + Canvas/p5.js + Web Serial + TensorFlow.js
+```
+
+The web route becomes more attractive after collecting data and training a TensorFlow/TensorFlow.js model, because Wekinator itself is not naturally browser-native.
 
 ## Can the Wekinator Model Run on Arduino?
 

@@ -371,6 +371,7 @@ The system turns small body or gaze movements into musical feedback, creating an
 Possible extensions:
 
 - MediaPipe or OpenCV for stronger hand, face, or eye tracking
+- Arduino with VL53L1X distance sensing for physical position data
 - Max/MSP, SuperCollider, Ableton Live, or Logic Pro for richer sound design
 - MIDI output to control external instruments
 - OSC to communicate with other creative coding tools
@@ -378,19 +379,27 @@ Possible extensions:
 - wearable sensors such as accelerometers or EMG
 - adaptive difficulty for education or therapy exercises
 - data logging to analyze user progress over time
+- TensorFlow for offline regression/classification models
+- TensorFlow.js for a future browser version
 
 ## Recommended Next Step
 
-The most realistic next improvement is to add movement features to Processing:
+The project now includes movement features, Arduino serial support, and CSV logging. The most realistic next improvement is to collect real datasets:
 
 ```text
-X, Y, velocityX, velocityY, speed, acceleration, confidence
+camera/movement features + Arduino distance features + desired musical outputs
 ```
 
-Then create a new Wekinator project with more inputs and train outputs such as:
+Then train the Wekinator fusion profile:
 
 ```text
-pitch, volume, vibrato, timbre brightness
+10 inputs -> 4 outputs
+```
+
+In parallel, the CSV logs can be used to train a starter TensorFlow model:
+
+```text
+noisy multimodal sensor features -> stable pitch, volume, vibrato, brightness
 ```
 
 After that, a second experiment can focus on trajectory classification:
@@ -398,4 +407,3 @@ After that, a second experiment can focus on trajectory classification:
 ```text
 circle, swipe, up, down, zigzag, hold
 ```
-

@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "description": "Draft exercise configuration for future gamified music and rehabilitation modes.",
+  "exercises": [
+    {
+      "id": "ode_to_joy_note_hold",
+      "name": "Ode to Joy Note Hold",
+      "type": "melody_hold",
+      "pitchMode": "chromatic",
+      "targetNotes": ["E4", "E4", "F4", "G4", "G4", "F4", "E4", "D4", "C4", "C4", "D4", "E4", "E4", "D4", "D4"],
+      "holdSeconds": 0.85,
+      "goal": "Hit each note and hold it steadily."
+    },
+    {
+      "id": "range_of_motion_horizontal",
+      "name": "Horizontal Range of Motion",
+      "type": "position_targets",
+      "targets": [
+        { "x": 0.2, "y": 0.5, "holdSeconds": 1.0 },
+        { "x": 0.5, "y": 0.5, "holdSeconds": 1.0 },
+        { "x": 0.8, "y": 0.5, "holdSeconds": 1.0 }
+      ],
+      "goal": "Practice controlled left-center-right movement."
+    },
+    {
+      "id": "stability_training",
+      "name": "Stability Training",
+      "type": "stability",
+      "target": { "x": 0.5, "y": 0.5 },
+      "holdSeconds": 3.0,
+      "maxNoise": 0.18,
+      "goal": "Keep the control point stable with low sensor noise."
+    },
+    {
+      "id": "expressive_vibrato",
+      "name": "Expressive Vibrato",
+      "type": "expression",
+      "targetSpeedRange": [0.25, 0.55],
+      "targetVibratoRange": [0.35, 0.75],
+      "goal": "Practice controlled energetic movement without losing pitch stability."
+    }
+  ]
+}
+

@@ -1,12 +1,15 @@
 import processing.video.*;
+import processing.serial.*;
 import oscP5.*;
 import netP5.*;
 import processing.sound.*;
+import java.io.File;
 
 // Virtual antenna theremin for MacBook Pro.
 // Processing -> Wekinator: /wek/inputs, localhost:6448
 //   basic profile: 2 inputs = pitch proximity, volume loop distance
 //   expressive profile: 6 inputs = pitch, volume, speed, acceleration, confidence, noise
+//   sensor fusion profile: 10 inputs = expressive inputs + Arduino physical sensor features
 // Wekinator -> Processing: /wek/outputs, localhost:12000
 //   basic profile: 2 outputs = pitch, volume
 //   expressive profile: 4 outputs = pitch, volume, vibrato, timbre brightness
@@ -16,12 +19,17 @@ final int PROCESSING_LISTEN_PORT = 12000;
 final int INPUT_MOUSE = 0;
 final int INPUT_MOTION = 1;
 final int INPUT_EYES = 2;
+final int INPUT_ARDUINO = 3;
 final int PITCH_CONTINUOUS = 0;
 final int PITCH_CHROMATIC = 1;
 final int PITCH_PENTATONIC = 2;
 final int PITCH_ODE_TO_JOY = 3;
+final int WEKI_BASIC = 0;
+final int WEKI_EXPRESSIVE = 1;
+final int WEKI_FUSION = 2;
 
 Capture camera;
+Serial arduinoPort;
 OscP5 oscP5;
 NetAddress wekinator;
 SinOsc theremin;
@@ -32,6 +40,11 @@ boolean cameraAvailable = false;
 boolean cameraTried = false;
 boolean mirrorCamera = true;
 int inputMode = INPUT_MOUSE;
+boolean arduinoAvailable = false;
+boolean arduinoTried = false;
+String arduinoPortName = "";
+String lastArduinoLine = "";
+int lastArduinoMillis = -9999;
 
 float handX = 450;
 float handY = 280;
@@ -45,6 +58,17 @@ float movementSpeed = 0;
 float movementAcceleration = 0;
 float sensorNoise = 0;
 float expressionEnergy = 0;
+float arduinoPitchMm = -1;
+float arduinoVolumeMm = -1;
+float arduinoPitchControl = 0;
+float arduinoVolumeControl = 0.75;
+float arduinoConfidence = 0;
+float arduinoSpeed = 0;
+float arduinoNoise = 0;
+float previousArduinoPitchControl = 0;
+float previousArduinoVolumeControl = 0.75;
+float arduinoMinMm = 50;
+float arduinoMaxMm = 650;
 float motionThreshold = 38;
 int motionPixels = 0;
 float eyeDarkOffset = 32;
@@ -89,9 +113,17 @@ int pitchMode = PITCH_CONTINUOUS;
 int currentMidiNote = -1;
 int currentMelodyIndex = -1;
 boolean sendToWekinator = true;
-boolean expressiveWekinator = false;
+int wekinatorProfile = WEKI_BASIC;
 boolean testTone = false;
 int oscSentCount = 0;
+boolean dataLogging = false;
+PrintWriter dataLog;
+String trainingLabel = "free";
+boolean practiceMode = false;
+int practiceStep = 0;
+int practiceScore = 0;
+float practiceHoldSeconds = 0;
+float practiceRequiredSeconds = 0.85;
 
 float minFreq = 160.0;
 float maxFreq = 1400.0;
@@ -130,10 +162,12 @@ void setup() {
   timbreOsc.play();
   timbreOsc.amp(0);
 
+  startArduinoSerial();
   textFont(createFont("Arial", 16));
 }
 
 void draw() {
+  updateArduinoFeatures();
   updateHandInput();
   updateInputs();
 
@@ -148,8 +182,8 @@ void draw() {
   if (useWekinator && wekinatorIsLive) {
     targetPitch = constrain(wekiPitch, 0, 1);
     targetVolume = constrain(wekiVolume, 0, 1) * handConfidence;
-    targetVibrato = expressiveWekinator ? constrain(wekiVibrato, 0, 1) * handConfidence : directVibrato;
-    targetBrightness = expressiveWekinator ? constrain(wekiBrightness, 0, 1) * handConfidence : directBrightness;
+    targetVibrato = wekinatorProfile != WEKI_BASIC ? constrain(wekiVibrato, 0, 1) * handConfidence : directVibrato;
+    targetBrightness = wekinatorProfile != WEKI_BASIC ? constrain(wekiBrightness, 0, 1) * handConfidence : directBrightness;
   } else {
     targetPitch = inputPitch;
     targetVolume = inputVolume * handConfidence;
@@ -182,6 +216,8 @@ void draw() {
   timbreOsc.freq(freq);
   timbreOsc.amp(amp * timbreMix * 0.22);
 
+  updatePracticeMode();
+  logDataFrame(freq, amp);
   drawTheremin(freq, amp, wekinatorIsLive);
 }
 
@@ -189,11 +225,20 @@ void captureEvent(Capture c) {
   c.read();
 }
 
+void serialEvent(Serial port) {
+  String line = port.readStringUntil('\n');
+  if (line != null) {
+    parseArduinoLine(trim(line));
+  }
+}
+
 void updateHandInput() {
   if (inputMode == INPUT_MOTION) {
     updateMotionHand();
   } else if (inputMode == INPUT_EYES) {
     updateEyeHand();
+  } else if (inputMode == INPUT_ARDUINO) {
+    updateArduinoHand();
   } else {
     updateMouseHand();
   }
@@ -226,6 +271,125 @@ void startCameraIfNeeded() {
   } catch (Exception e) {
     println("Camera could not be started: " + e.getMessage());
   }
+}
+
+void startArduinoSerial() {
+  if (arduinoAvailable || arduinoTried) {
+    return;
+  }
+
+  arduinoTried = true;
+  try {
+    String[] ports = Serial.list();
+    for (int i = 0; i < ports.length; i++) {
+      String lower = ports[i].toLowerCase();
+      if (lower.indexOf("usbmodem") >= 0 || lower.indexOf("usbserial") >= 0 || lower.indexOf("wchusbserial") >= 0) {
+        arduinoPortName = ports[i];
+        break;
+      }
+    }
+
+    if (arduinoPortName.length() > 0) {
+      arduinoPort = new Serial(this, arduinoPortName, 115200);
+      arduinoPort.bufferUntil('\n');
+      arduinoAvailable = true;
+      println("Arduino serial connected: " + arduinoPortName);
+    }
+  } catch (Exception e) {
+    println("Arduino serial could not be started: " + e.getMessage());
+    arduinoAvailable = false;
+  }
+}
+
+void parseArduinoLine(String line) {
+  if (line == null || line.length() == 0) {
+    return;
+  }
+
+  String[] parts = splitTokens(line, ", ");
+  if (parts.length < 2) {
+    return;
+  }
+
+  int offset = parts[0].equals("A") ? 1 : 0;
+  if (parts.length - offset < 1) {
+    return;
+  }
+
+  arduinoPitchMm = parseSafeFloat(parts[offset], arduinoPitchMm);
+  if (parts.length - offset >= 2) {
+    arduinoVolumeMm = parseSafeFloat(parts[offset + 1], arduinoVolumeMm);
+  }
+  if (parts.length - offset >= 3) {
+    arduinoConfidence = constrain(parseSafeFloat(parts[offset + 2], arduinoConfidence), 0, 1);
+  } else {
+    arduinoConfidence = 1;
+  }
+
+  lastArduinoLine = line;
+  lastArduinoMillis = millis();
+}
+
+float parseSafeFloat(String value, float fallback) {
+  try {
+    return Float.parseFloat(value);
+  } catch (Exception e) {
+    return fallback;
+  }
+}
+
+void updateArduinoFeatures() {
+  boolean live = arduinoIsLive();
+
+  if (!live) {
+    arduinoConfidence = lerp(arduinoConfidence, 0, 0.06);
+  }
+
+  float pitchNorm = normalizeArduinoDistance(arduinoPitchMm);
+  float volumeNorm = arduinoVolumeMm >= 0 ? normalizeArduinoDistance(arduinoVolumeMm) : 0.75;
+
+  arduinoPitchControl = constrain(1.0 - pitchNorm, 0, 1);
+  arduinoVolumeControl = constrain(volumeNorm, 0, 1);
+
+  float pitchDelta = abs(arduinoPitchControl - previousArduinoPitchControl);
+  float volumeDelta = abs(arduinoVolumeControl - previousArduinoVolumeControl);
+  float instantArduinoSpeed = constrain((pitchDelta + volumeDelta) * 8.0, 0, 1);
+
+  arduinoSpeed = lerp(arduinoSpeed, instantArduinoSpeed, 0.20);
+  arduinoNoise = lerp(arduinoNoise, constrain(abs(instantArduinoSpeed - arduinoSpeed) * 3.0 + (1.0 - arduinoConfidence) * 0.25, 0, 1), 0.16);
+
+  previousArduinoPitchControl = arduinoPitchControl;
+  previousArduinoVolumeControl = arduinoVolumeControl;
+}
+
+boolean arduinoIsLive() {
+  return arduinoAvailable && millis() - lastArduinoMillis < 900;
+}
+
+float normalizeArduinoDistance(float distanceMm) {
+  if (distanceMm < 0) {
+    return 1;
+  }
+  return constrain((distanceMm - arduinoMinMm) / (arduinoMaxMm - arduinoMinMm), 0, 1);
+}
+
+void updateArduinoHand() {
+  startArduinoSerial();
+
+  if (!arduinoIsLive()) {
+    updateMouseHand();
+    return;
+  }
+
+  rawHandX = map(arduinoPitchControl, 0, 1, 110, pitchAntennaX());
+  rawHandY = map(arduinoVolumeControl, 0, 1, height - 110, 95);
+  handConfidence = lerp(handConfidence, constrain(arduinoConfidence, 0.2, 1), 0.25);
+  motionPixels = 0;
+  eyeDarkPixels = 0;
+  eyeCalibrated = false;
+
+  handX = lerp(handX, rawHandX, 0.25);
+  handY = lerp(handY, rawHandY, 0.25);
 }
 
 void updateMotionHand() {
@@ -402,11 +566,16 @@ float pixelBrightness(int c) {
 }
 
 void updateInputs() {
-  float pitchDistance = max(0, pitchAntennaX() - handX);
-  inputPitch = constrain(1.0 - pitchDistance / pitchRange, 0, 1);
+  if (inputMode == INPUT_ARDUINO && arduinoIsLive()) {
+    inputPitch = arduinoPitchControl;
+    inputVolume = arduinoVolumeControl;
+  } else {
+    float pitchDistance = max(0, pitchAntennaX() - handX);
+    inputPitch = constrain(1.0 - pitchDistance / pitchRange, 0, 1);
 
-  float loopDistance = dist(handX, handY, volumeLoopX(), volumeLoopY());
-  inputVolume = constrain((loopDistance - 35.0) / volumeRange, 0, 1);
+    float loopDistance = dist(handX, handY, volumeLoopX(), volumeLoopY());
+    inputVolume = constrain((loopDistance - 35.0) / volumeRange, 0, 1);
+  }
 
   float dx = handX - previousHandX;
   float dy = handY - previousHandY;
@@ -427,11 +596,17 @@ void sendOscToWekinator() {
   OscMessage msg = new OscMessage("/wek/inputs");
   msg.add(inputPitch);
   msg.add(inputVolume);
-  if (expressiveWekinator) {
+  if (wekinatorProfile == WEKI_EXPRESSIVE || wekinatorProfile == WEKI_FUSION) {
     msg.add(movementSpeed);
     msg.add(movementAcceleration);
     msg.add(handConfidence);
     msg.add(sensorNoise);
+  }
+  if (wekinatorProfile == WEKI_FUSION) {
+    msg.add(arduinoPitchControl);
+    msg.add(arduinoVolumeControl);
+    msg.add(arduinoSpeed);
+    msg.add(arduinoConfidence);
   }
   oscP5.send(msg, wekinator);
   oscSentCount++;
@@ -528,15 +703,25 @@ void keyPressed() {
   } else if (key == 's' || key == 'S') {
     sendToWekinator = !sendToWekinator;
   } else if (key == 'x' || key == 'X') {
-    expressiveWekinator = !expressiveWekinator;
+    wekinatorProfile = (wekinatorProfile + 1) % 3;
     gotWekinatorOutput = false;
+  } else if (key == 'l' || key == 'L') {
+    toggleDataLogging();
+  } else if (key == 'p' || key == 'P') {
+    practiceMode = !practiceMode;
+    if (practiceMode) {
+      pitchMode = PITCH_CHROMATIC;
+      practiceHoldSeconds = 0;
+    }
   } else if (key == 't' || key == 'T') {
     testTone = !testTone;
   } else if (key == 'c' || key == 'C') {
-    inputMode = (inputMode + 1) % 3;
+    inputMode = (inputMode + 1) % 4;
     if (inputMode == INPUT_MOTION || inputMode == INPUT_EYES) {
       startCameraIfNeeded();
       resetMotionReference();
+    } else if (inputMode == INPUT_ARDUINO) {
+      startArduinoSerial();
     }
   } else if (key == 'e' || key == 'E') {
     if (inputMode == INPUT_EYES) {
@@ -569,6 +754,8 @@ void keyPressed() {
     if (inputMode == INPUT_EYES) {
       eyeDarkOffset = max(8, eyeDarkOffset - 4);
     }
+  } else if (key >= '0' && key <= '9') {
+    setTrainingLabel(key);
   }
 }
 
@@ -583,6 +770,152 @@ void adjustSensorSensitivity(float direction) {
 
 void mousePressed() {
   muted = false;
+}
+
+void exit() {
+  if (dataLog != null) {
+    dataLog.flush();
+    dataLog.close();
+  }
+  super.exit();
+}
+
+void toggleDataLogging() {
+  if (dataLogging) {
+    dataLogging = false;
+    if (dataLog != null) {
+      dataLog.flush();
+      dataLog.close();
+      dataLog = null;
+    }
+    return;
+  }
+
+  File dir = new File(sketchPath("data_logs"));
+  if (!dir.exists()) {
+    dir.mkdirs();
+  }
+
+  String filename = "data_logs/session-" + year() + nf(month(), 2) + nf(day(), 2) + "-"
+    + nf(hour(), 2) + nf(minute(), 2) + nf(second(), 2) + ".csv";
+  dataLog = createWriter(filename);
+  dataLog.println(dataLogHeader());
+  dataLogging = true;
+  println("Data logging started: " + filename);
+}
+
+String dataLogHeader() {
+  return "millis,input_mode,wekinator_profile,label,input_pitch,input_volume,movement_speed,movement_acceleration,hand_confidence,sensor_noise,"
+    + "arduino_pitch_mm,arduino_volume_mm,arduino_pitch_control,arduino_volume_control,arduino_speed,arduino_confidence,arduino_noise,"
+    + "weki_pitch,weki_volume,weki_vibrato,weki_brightness,target_pitch,target_volume,target_vibrato,target_brightness,current_midi_note,freq,amp";
+}
+
+void logDataFrame(float freq, float amp) {
+  if (!dataLogging || dataLog == null || frameCount % 3 != 0) {
+    return;
+  }
+
+  dataLog.println(millis() + ","
+    + inputModeLabelForData() + ","
+    + wekinatorProfileLabelForData() + ","
+    + trainingLabel + ","
+    + nf(inputPitch, 1, 4) + ","
+    + nf(inputVolume, 1, 4) + ","
+    + nf(movementSpeed, 1, 4) + ","
+    + nf(movementAcceleration, 1, 4) + ","
+    + nf(handConfidence, 1, 4) + ","
+    + nf(sensorNoise, 1, 4) + ","
+    + nf(arduinoPitchMm, 1, 2) + ","
+    + nf(arduinoVolumeMm, 1, 2) + ","
+    + nf(arduinoPitchControl, 1, 4) + ","
+    + nf(arduinoVolumeControl, 1, 4) + ","
+    + nf(arduinoSpeed, 1, 4) + ","
+    + nf(arduinoConfidence, 1, 4) + ","
+    + nf(arduinoNoise, 1, 4) + ","
+    + nf(wekiPitch, 1, 4) + ","
+    + nf(wekiVolume, 1, 4) + ","
+    + nf(wekiVibrato, 1, 4) + ","
+    + nf(wekiBrightness, 1, 4) + ","
+    + nf(targetPitch, 1, 4) + ","
+    + nf(targetVolume, 1, 4) + ","
+    + nf(targetVibrato, 1, 4) + ","
+    + nf(targetBrightness, 1, 4) + ","
+    + currentMidiNote + ","
+    + nf(freq, 1, 2) + ","
+    + nf(amp, 1, 4));
+  dataLog.flush();
+}
+
+String inputModeLabelForData() {
+  if (inputMode == INPUT_MOTION) {
+    return "motion";
+  }
+  if (inputMode == INPUT_EYES) {
+    return "eyes";
+  }
+  if (inputMode == INPUT_ARDUINO) {
+    return "arduino";
+  }
+  return "mouse";
+}
+
+String wekinatorProfileLabelForData() {
+  if (wekinatorProfile == WEKI_FUSION) {
+    return "fusion";
+  }
+  if (wekinatorProfile == WEKI_EXPRESSIVE) {
+    return "expressive";
+  }
+  return "basic";
+}
+
+void setTrainingLabel(char numberKey) {
+  if (numberKey == '1') {
+    trainingLabel = "low";
+  } else if (numberKey == '2') {
+    trainingLabel = "middle";
+  } else if (numberKey == '3') {
+    trainingLabel = "high";
+  } else if (numberKey == '4') {
+    trainingLabel = "stable";
+  } else if (numberKey == '5') {
+    trainingLabel = "expressive";
+  } else if (numberKey == '6') {
+    trainingLabel = "noisy";
+  } else if (numberKey == '7') {
+    trainingLabel = "left";
+  } else if (numberKey == '8') {
+    trainingLabel = "right";
+  } else if (numberKey == '9') {
+    trainingLabel = "hold";
+  } else {
+    trainingLabel = "free";
+  }
+}
+
+void updatePracticeMode() {
+  if (!practiceMode) {
+    return;
+  }
+
+  int targetNote = practiceTargetMidi();
+  boolean noteMatches = currentMidiNote == targetNote && smoothVolume > 0.08;
+
+  if (noteMatches) {
+    practiceHoldSeconds += 1.0 / max(1.0, frameRate);
+  } else {
+    practiceHoldSeconds = max(0, practiceHoldSeconds - 0.035);
+  }
+
+  if (practiceHoldSeconds >= practiceRequiredSeconds) {
+    practiceScore++;
+    practiceStep = (practiceStep + 1) % odeToJoyMidi.length;
+    practiceHoldSeconds = 0;
+  }
+}
+
+int practiceTargetMidi() {
+  return odeToJoyMidi[practiceStep % odeToJoyMidi.length];
 }
 
 void resetMotionReference() {
@@ -609,6 +942,7 @@ void drawTheremin(float freq, float amp, boolean wekinatorIsLive) {
   drawVirtualHand();
   drawVolumeMeter(amp);
   drawHud(freq, amp, wekinatorIsLive);
+  drawPracticeOverlay();
 }
 
 void drawInputBackground() {
@@ -851,24 +1185,29 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   String inputText = inputModeLabel();
   if ((inputMode == INPUT_MOTION || inputMode == INPUT_EYES) && !cameraAvailable) {
     inputText += ", mouse fallback";
+  } else if (inputMode == INPUT_ARDUINO && !arduinoIsLive()) {
+    inputText += ", mouse fallback";
   }
   String cameraText = cameraAvailable ? "camera on" : "camera off";
-  String sensorText = inputMode == INPUT_EYES
-    ? "eye gain X/Y: " + nf(eyeSensitivityX, 1, 1) + "/" + nf(eyeSensitivityY, 1, 1) + " / dark: " + int(eyeDarkOffset) + " / pixels: " + eyeDarkPixels
-    : "motion: " + motionPixels + " / threshold: " + int(motionThreshold);
+  String arduinoText = arduinoIsLive()
+    ? "arduino: " + int(arduinoPitchMm) + "mm/" + int(arduinoVolumeMm) + "mm"
+    : "arduino: waiting";
+  String sensorText = sensorStatusText();
   String expressiveText = "speed: " + nf(movementSpeed, 1, 2)
     + " / accel: " + nf(movementAcceleration, 1, 2)
     + " / noise: " + nf(sensorNoise, 1, 2)
     + " / vib: " + nf(smoothVibrato, 1, 2)
     + " / bright: " + nf(smoothBrightness, 1, 2);
+  String logText = dataLogging ? "log on " + trainingLabel : "log off";
+  String practiceText = practiceMode ? "practice on" : "practice off";
 
   fill(255);
   text("Mode: " + mode + " / " + live + testText, 24, height - 154);
   text("Sound: " + muteText + " / Pitch: " + pitchText + noteText, 24, height - 132);
   text("Freq: " + int(freq) + " Hz / Amp: " + nf(amp, 1, 3) + " / OSC: " + sendText + " / " + profileText + " / Sent: " + oscSentCount, 24, height - 110);
-  text("Input: " + inputText + " / " + cameraText + " / " + sensorText, 24, height - 82);
+  text("Input: " + inputText + " / " + cameraText + " / " + arduinoText + " / " + sensorText, 24, height - 82);
   text("Expression: " + expressiveText, 24, height - 58);
-  text("Keys: C input, X profile, W Wekinator, Q pitch, F/G sens, H/Y vertical, A/D dark, E/R eyes", 24, height - 34);
+  text("Keys: C input, X profile, P practice, L log, W Wekinator, Q pitch, F/G sens, E/R eyes", 24, height - 34);
 
   textAlign(RIGHT, TOP);
   fill(190);
@@ -879,13 +1218,63 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   text("weki volume: " + nf(wekiVolume, 1, 2), width - 24, 110);
   text("weki vibrato: " + nf(wekiVibrato, 1, 2), width - 24, 132);
   text("weki brightness: " + nf(wekiBrightness, 1, 2), width - 24, 154);
+  text(logText + " / " + practiceText, width - 24, 176);
   if (inputMode == INPUT_EYES) {
-    text("eye raw: " + nf(eyeRawX, 1, 2) + ", " + nf(eyeRawY, 1, 2), width - 24, 176);
+    text("eye raw: " + nf(eyeRawX, 1, 2) + ", " + nf(eyeRawY, 1, 2), width - 24, 198);
   }
 }
 
+String sensorStatusText() {
+  if (inputMode == INPUT_EYES) {
+    return "eye gain X/Y: " + nf(eyeSensitivityX, 1, 1) + "/" + nf(eyeSensitivityY, 1, 1)
+      + " / dark: " + int(eyeDarkOffset)
+      + " / pixels: " + eyeDarkPixels;
+  }
+  if (inputMode == INPUT_ARDUINO) {
+    return "physical pitch/vol: " + nf(arduinoPitchControl, 1, 2) + "/" + nf(arduinoVolumeControl, 1, 2)
+      + " / sensor speed: " + nf(arduinoSpeed, 1, 2);
+  }
+  return "motion: " + motionPixels + " / threshold: " + int(motionThreshold);
+}
+
+void drawPracticeOverlay() {
+  if (!practiceMode) {
+    return;
+  }
+
+  int targetNote = practiceTargetMidi();
+  float progress = constrain(practiceHoldSeconds / practiceRequiredSeconds, 0, 1);
+  boolean noteMatches = currentMidiNote == targetNote && smoothVolume > 0.08;
+
+  float panelX = width * 0.5 - 170;
+  float panelY = 104;
+  float panelW = 340;
+  float panelH = 94;
+
+  noStroke();
+  fill(12, 17, 24, 218);
+  rect(panelX, panelY, panelW, panelH, 7);
+
+  fill(255);
+  textAlign(CENTER, TOP);
+  textSize(18);
+  text("Practice target: " + midiNoteName(targetNote), width * 0.5, panelY + 12);
+
+  fill(noteMatches ? color(112, 232, 163) : color(255, 194, 80));
+  textSize(14);
+  text("score " + practiceScore + " / step " + (practiceStep + 1) + " of " + odeToJoyMidi.length, width * 0.5, panelY + 40);
+
+  fill(255, 255, 255, 45);
+  rect(panelX + 28, panelY + 68, panelW - 56, 10, 5);
+  fill(noteMatches ? color(112, 232, 163) : color(255, 194, 80));
+  rect(panelX + 28, panelY + 68, (panelW - 56) * progress, 10, 5);
+}
+
 String wekinatorProfileLabel() {
-  if (expressiveWekinator) {
+  if (wekinatorProfile == WEKI_FUSION) {
+    return "fusion OSC: 10 inputs / 4 outputs";
+  }
+  if (wekinatorProfile == WEKI_EXPRESSIVE) {
     return "expressive OSC: 6 inputs / 4 outputs";
   }
   return "basic OSC: 2 inputs / 2 outputs";
@@ -897,6 +1286,9 @@ String inputModeLabel() {
   }
   if (inputMode == INPUT_EYES) {
     return "eye motion";
+  }
+  if (inputMode == INPUT_ARDUINO) {
+    return "arduino sensor";
   }
   return "mouse hand";
 }
