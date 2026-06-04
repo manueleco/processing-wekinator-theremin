@@ -1,6 +1,12 @@
-# Processing Wekinator Theremin
+# Adaptive Expressive Theremin
 
-Virtual theremin built with Processing and Wekinator.
+## Abstract
+
+Adaptive Expressive Theremin is an interactive machine-learning musical interface built with Processing and Wekinator. The project extends the idea of a virtual theremin by combining camera-based movement tracking, experimental gaze-inspired control, optional Arduino distance sensing, and real-time supervised learning. Instead of using only fixed rules such as `position -> pitch`, the system can train Wekinator to transform noisy and personal movement data into stable musical controls such as pitch, volume, vibrato, and timbre brightness.
+
+The project explores how musical interaction can become more adaptive, expressive, and accessible. It includes chromatic pitch quantization for precise notes, an `Ode to Joy` melody mode for guided musical practice, a first gamified note-hold exercise, CSV data logging for future TensorFlow experiments, and an Arduino sensor-fusion path for matching physical distance sensing with camera/movement features. The work is framed as an educational and creative prototype, with possible extensions toward rehabilitation-style exercises, personalized motor-control practice, and browser or macOS app delivery.
+
+## Project Overview
 
 The sketch simulates a theremin with two virtual antennas:
 
@@ -8,7 +14,16 @@ The sketch simulates a theremin with two virtual antennas:
 - A volume loop on the left.
 - A virtual hand controlled by the mouse, camera motion detection, experimental eye-motion detection, or optional Arduino distance sensing.
 
-Processing sends the virtual hand features to Wekinator through OSC. Wekinator learns a continuous mapping and sends back `pitch` and `volume`, which Processing turns into a sine-wave theremin sound and reactive visuals.
+Processing sends movement and sensor features to Wekinator through OSC. Wekinator learns a continuous mapping and sends back musical controls, which Processing turns into sound and reactive visuals.
+
+## Core Contributions
+
+- Real-time Processing instrument with sound, visuals, camera, OSC, and optional serial input.
+- Wekinator profiles for basic mapping, expressive control, and Arduino/camera sensor fusion.
+- Musical pitch modes: continuous, chromatic, pentatonic, and `Ode to Joy`.
+- Optional Arduino VL53L1X distance-sensor layer.
+- CSV logging and TensorFlow starter pipeline for future model training.
+- First gamified exercise mode for note-hold practice.
 
 ## Main Sketch
 
