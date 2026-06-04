@@ -77,11 +77,15 @@ Press `C` until the input mode says:
 Input: arduino sensor
 ```
 
+Press `O` in Processing to connect or retry Arduino serial.
+
 Press `X` until the Wekinator profile says:
 
 ```text
 fusion OSC: 10 inputs / 4 outputs
 ```
+
+If no Arduino is connected, Processing will not auto-open serial while cycling input modes. The Arduino input mode falls back to mouse control until `O` successfully connects a board.
 
 ## Wekinator Fusion Profile
 
@@ -135,4 +139,3 @@ The recommended future physical build is:
 - left-side VL53L1X for volume distance
 
 Two VL53L1X sensors require handling their I2C addresses with XSHUT pins, because they normally start with the same default address.
-

@@ -153,6 +153,7 @@ camera/movement estimate + physical distance sensor -> stable expressive musical
 - `C`: switch input mode, mouse hand / camera motion / eye motion / Arduino sensor.
 - `M`: mute / unmute.
 - `W`: direct preview / Wekinator mode.
+- `O`: connect / retry Arduino serial.
 - `X`: switch Wekinator OSC profile, basic 2x2 / expressive 6x4 / fusion 10x4.
 - `Q`: continuous pitch / chromatic pitch / pentatonic pitch / Ode to Joy pitch.
 - `T`: test tone.
@@ -232,8 +233,11 @@ Steps:
 1. Upload `arduino/tof_single_sensor/tof_single_sensor.ino`.
 2. Close Arduino Serial Monitor so Processing can open the serial port.
 3. Run the Processing sketch.
-4. Press `C` until the HUD says `Input: arduino sensor`.
-5. Press `X` until the HUD says `fusion OSC: 10 inputs / 4 outputs`.
+4. Press `O` to connect or retry Arduino serial.
+5. Press `C` until the HUD says `Input: arduino sensor`.
+6. Press `X` until the HUD says `fusion OSC: 10 inputs / 4 outputs`.
+
+If Arduino is not connected, the sketch does not try to open serial automatically. The Arduino input mode falls back to mouse control, so cycling inputs with `C` should remain safe.
 
 See:
 

@@ -73,9 +73,12 @@ This is the strongest justification for Wekinator: it learns how to combine nois
 1. Connect a VL53L1X distance sensor to Arduino.
 2. Upload `arduino/tof_single_sensor/tof_single_sensor.ino`.
 3. Run the Processing sketch.
-4. Press `C` until `Input: arduino sensor`.
-5. Press `X` until `fusion OSC: 10 inputs / 4 outputs`.
-6. Train Wekinator with examples of stable positions and expressive movements.
+4. Press `O` to connect or retry Arduino serial.
+5. Press `C` until `Input: arduino sensor`.
+6. Press `X` until `fusion OSC: 10 inputs / 4 outputs`.
+7. Train Wekinator with examples of stable positions and expressive movements.
+
+Cycling input modes with `C` does not open serial automatically. This keeps the sketch usable when Arduino is not connected.
 
 ## Data Collection Process
 
@@ -125,4 +128,3 @@ config/exercises.json
 ```
 
 The Processing sketch does not load this JSON yet. It documents the planned configurable structure.
-

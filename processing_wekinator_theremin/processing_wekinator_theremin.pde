@@ -162,7 +162,6 @@ void setup() {
   timbreOsc.play();
   timbreOsc.amp(0);
 
-  startArduinoSerial();
   textFont(createFont("Arial", 16));
 }
 
@@ -294,11 +293,31 @@ void startArduinoSerial() {
       arduinoPort.bufferUntil('\n');
       arduinoAvailable = true;
       println("Arduino serial connected: " + arduinoPortName);
+    } else {
+      println("Arduino serial not found. Press O to retry after connecting the board.");
     }
   } catch (Exception e) {
     println("Arduino serial could not be started: " + e.getMessage());
     arduinoAvailable = false;
+    arduinoPort = null;
   }
+}
+
+void retryArduinoSerial() {
+  try {
+    if (arduinoPort != null) {
+      arduinoPort.stop();
+      arduinoPort = null;
+    }
+  } catch (Exception e) {
+    println("Arduino serial close failed: " + e.getMessage());
+  }
+
+  arduinoAvailable = false;
+  arduinoTried = false;
+  arduinoPortName = "";
+  lastArduinoMillis = -9999;
+  startArduinoSerial();
 }
 
 void parseArduinoLine(String line) {
@@ -374,8 +393,6 @@ float normalizeArduinoDistance(float distanceMm) {
 }
 
 void updateArduinoHand() {
-  startArduinoSerial();
-
   if (!arduinoIsLive()) {
     updateMouseHand();
     return;
@@ -705,6 +722,8 @@ void keyPressed() {
   } else if (key == 'x' || key == 'X') {
     wekinatorProfile = (wekinatorProfile + 1) % 3;
     gotWekinatorOutput = false;
+  } else if (key == 'o' || key == 'O') {
+    retryArduinoSerial();
   } else if (key == 'l' || key == 'L') {
     toggleDataLogging();
   } else if (key == 'p' || key == 'P') {
@@ -720,8 +739,6 @@ void keyPressed() {
     if (inputMode == INPUT_MOTION || inputMode == INPUT_EYES) {
       startCameraIfNeeded();
       resetMotionReference();
-    } else if (inputMode == INPUT_ARDUINO) {
-      startArduinoSerial();
     }
   } else if (key == 'e' || key == 'E') {
     if (inputMode == INPUT_EYES) {
@@ -1191,7 +1208,7 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   String cameraText = cameraAvailable ? "camera on" : "camera off";
   String arduinoText = arduinoIsLive()
     ? "arduino: " + int(arduinoPitchMm) + "mm/" + int(arduinoVolumeMm) + "mm"
-    : "arduino: waiting";
+    : "arduino: not connected, press O";
   String sensorText = sensorStatusText();
   String expressiveText = "speed: " + nf(movementSpeed, 1, 2)
     + " / accel: " + nf(movementAcceleration, 1, 2)
@@ -1207,7 +1224,7 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   text("Freq: " + int(freq) + " Hz / Amp: " + nf(amp, 1, 3) + " / OSC: " + sendText + " / " + profileText + " / Sent: " + oscSentCount, 24, height - 110);
   text("Input: " + inputText + " / " + cameraText + " / " + arduinoText + " / " + sensorText, 24, height - 82);
   text("Expression: " + expressiveText, 24, height - 58);
-  text("Keys: C input, X profile, P practice, L log, W Wekinator, Q pitch, F/G sens, E/R eyes", 24, height - 34);
+  text("Keys: C input, O Arduino, X profile, P practice, L log, W Wekinator, Q pitch, F/G sens", 24, height - 34);
 
   textAlign(RIGHT, TOP);
   fill(190);
