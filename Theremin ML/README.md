@@ -413,4 +413,5 @@ Project tracking docs:
 
 - `PROCESS.md`
 - `DONE.md`
+- `NEXT_STEPS.md`
 - `FUTURE_WORK.md`
