@@ -12,6 +12,29 @@ Processing macOS app export + Wekinator companion app
 
 Wekinator remains a separate application for the current course prototype.
 
+## Local Launcher App
+
+Before creating a full Processing export, you can create a local macOS launcher app:
+
+```bash
+cd "Theremin ML"
+python tools/build_macos_launcher.py
+```
+
+This creates:
+
+```text
+dist/Adaptive Expressive Theremin Launcher.app
+```
+
+This app is a launcher, not a standalone export. It requires Processing to be installed in `/Applications` and runs the sketch from the project folder.
+
+For a transparent double-click launcher, use:
+
+```text
+scripts/run_demo.command
+```
+
 ## Export From Processing IDE
 
 1. Open:

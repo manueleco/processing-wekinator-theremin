@@ -15,6 +15,8 @@ Operational guides:
 - `DEMO_PLAN.md`: what to show in the live demo and in what order.
 - `TRAINING_PROTOCOL.md`: how to train Wekinator `6 inputs / 4 outputs` and collect CSV data.
 - `APP_EXPORT.md`: how to export and validate a macOS Processing app.
+- `ml/MODEL_CARD_TEMPLATE.md`: how to document trained model behavior and limitations.
+- `ml/DATASET_CARD_TEMPLATE.md`: how to document CSV data used for training.
 
 ## Processing Roles
 
@@ -125,6 +127,8 @@ python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
 ```bash
 python ml/train_csvs.py
 ```
+
+When training succeeds, keep the generated model/report under `ml/models/` locally and use the model card template to document the result before deciding whether to include it in a final deliverable.
 
 For the current deliverable, collect at least 2-3 CSV sessions before treating the TensorFlow model as meaningful. The local smoke-test CSV files are not enough for a final trained model.
 

@@ -8,6 +8,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -97,19 +99,90 @@ def build_model(tf, normalizer):
     return model
 
 
+def count_column_values(data, column: str) -> dict[str, int]:
+    if column not in data.columns:
+        return {}
+    counts = data[column].fillna("unknown").astype(str).value_counts().to_dict()
+    return {key: int(value) for key, value in counts.items()}
+
+
+def write_training_report(
+    report_path: Path,
+    args: argparse.Namespace,
+    csv_paths: list[Path],
+    data,
+    train_rows: int,
+    test_rows: int,
+    loss: float,
+    mae: float,
+    history,
+) -> None:
+    report = {
+        "schema_version": 1,
+        "trained_at_utc": datetime.now(timezone.utc).isoformat(),
+        "model_type": "keras_regression",
+        "objective": "sensor_features_to_stable_expressive_controls",
+        "input_csv_files": [str(path) for path in csv_paths],
+        "output_model": str(args.output),
+        "rows_clean": int(len(data)),
+        "rows_train": int(train_rows),
+        "rows_test": int(test_rows),
+        "seed": int(args.seed),
+        "epochs": int(args.epochs),
+        "batch_size": int(args.batch_size),
+        "test_split": float(args.test_split),
+        "validation_split": float(args.validation_split),
+        "feature_columns": FEATURE_COLUMNS,
+        "target_columns": TARGET_COLUMNS,
+        "label_counts": count_column_values(data, "label"),
+        "input_mode_counts": count_column_values(data, "input_mode"),
+        "wekinator_profile_counts": count_column_values(data, "wekinator_profile"),
+        "metrics": {
+            "test_loss_mse": float(loss),
+            "test_mae": float(mae),
+        },
+        "last_epoch": {
+            key: float(values[-1])
+            for key, values in history.history.items()
+            if values
+        },
+        "known_limitations": [
+            "Prototype model for educational use, not a medical device.",
+            "Quality depends on labeled CSV coverage and sensor consistency.",
+            "Model should be re-trained when camera setup, lighting, or user movement range changes.",
+        ],
+    }
+
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("csv", nargs="+", type=Path, help="Processing CSV log files")
     parser.add_argument("--epochs", type=int, default=80)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--test-split", type=float, default=0.2)
+    parser.add_argument("--validation-split", type=float, default=0.2)
     parser.add_argument("--output", type=Path, default=Path("ml/models/sensor_fusion_model.keras"))
+    parser.add_argument("--report", type=Path)
     args = parser.parse_args()
+
+    if not 0 < args.test_split < 1:
+        raise SystemExit("--test-split must be between 0 and 1.")
+    if not 0 <= args.validation_split < 1:
+        raise SystemExit("--validation-split must be between 0 and 1.")
 
     np, pd = import_ml_dependencies()
     tf = import_tensorflow()
-    data = load_dataset(args.csv, np, pd)
-    shuffled = data.sample(frac=1.0, random_state=42).reset_index(drop=True)
+    tf.keras.utils.set_random_seed(args.seed)
 
-    split_index = int(len(shuffled) * 0.8)
+    data = load_dataset(args.csv, np, pd)
+    shuffled = data.sample(frac=1.0, random_state=args.seed).reset_index(drop=True)
+
+    split_index = int(len(shuffled) * (1.0 - args.test_split))
+    split_index = max(1, min(split_index, len(shuffled) - 1))
     train = shuffled.iloc[:split_index]
     test = shuffled.iloc[split_index:]
 
@@ -122,12 +195,12 @@ def main() -> None:
     normalizer.adapt(x_train)
 
     model = build_model(tf, normalizer)
-    model.fit(
+    history = model.fit(
         x_train,
         y_train,
-        validation_split=0.2,
+        validation_split=args.validation_split,
         epochs=args.epochs,
-        batch_size=64,
+        batch_size=args.batch_size,
         verbose=2,
     )
 
@@ -149,6 +222,20 @@ def main() -> None:
         encoding="utf-8",
     )
     print(f"metadata={metadata_path}")
+
+    report_path = args.report if args.report is not None else args.output.with_suffix(".report.json")
+    write_training_report(
+        report_path=report_path,
+        args=args,
+        csv_paths=args.csv,
+        data=data,
+        train_rows=len(train),
+        test_rows=len(test),
+        loss=loss,
+        mae=mae,
+        history=history,
+    )
+    print(f"report={report_path}")
 
 
 if __name__ == "__main__":

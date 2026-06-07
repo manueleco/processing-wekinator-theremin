@@ -65,6 +65,12 @@ python ml/train_csvs.py
 
 This validates the CSV files first and then trains only when the dataset is ready.
 
+On macOS, you can also double-click:
+
+```text
+scripts/train_csvs.command
+```
+
 To run the two steps manually, first check whether the dataset is ready:
 
 ```bash
@@ -107,7 +113,26 @@ Outputs are saved under:
 ml/models/
 ```
 
+Expected files:
+
+```text
+sensor_fusion_model.keras
+sensor_fusion_model.features.txt
+sensor_fusion_model.report.json
+```
+
 If TensorFlow is not installed, the training script will print the virtual-environment install command instead of failing with an unclear import error.
+
+## Model Documentation
+
+Use:
+
+```text
+MODEL_CARD_TEMPLATE.md
+DATASET_CARD_TEMPLATE.md
+```
+
+These are lightweight best-practice templates for documenting intended use, dataset quality, evaluation, limitations, and privacy/safety notes.
 
 ## What the Model Learns
 

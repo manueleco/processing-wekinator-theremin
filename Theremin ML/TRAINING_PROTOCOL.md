@@ -164,6 +164,12 @@ python ml/train_csvs.py
 
 This runs `ml/check_dataset.py` first. If the dataset is ready, it then runs `ml/train_sensor_fusion.py`.
 
+On macOS, you can also double-click:
+
+```text
+scripts/train_csvs.command
+```
+
 Manual version:
 
 ```bash
@@ -177,6 +183,14 @@ Expected output:
 ```text
 ml/models/sensor_fusion_model.keras
 ml/models/sensor_fusion_model.features.txt
+ml/models/sensor_fusion_model.report.json
+```
+
+Use these templates to document the trained artifact:
+
+```text
+ml/MODEL_CARD_TEMPLATE.md
+ml/DATASET_CARD_TEMPLATE.md
 ```
 
 Current environment note:

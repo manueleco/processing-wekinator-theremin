@@ -322,6 +322,26 @@ Processing -> File -> Export Application
 
 This keeps camera, sound, serial, and OSC support together. Wekinator would still run as a separate companion app for the course prototype.
 
+As an interim application-style experience, the project includes macOS launcher helpers:
+
+```text
+scripts/run_demo.command
+tools/build_macos_launcher.py
+```
+
+The generated launcher app runs the Processing sketch from the local project folder. It is useful for demos before a final Processing export is created.
+
+## AI Model Practice
+
+The TensorFlow path should be treated like an offline model-development workflow:
+
+- validate CSV readiness before training
+- keep generated models under `ml/models/`
+- save a training report with metrics and dataset summary
+- document intended use and limitations with a model card
+- document data collection with a dataset card
+- avoid medical claims and present rehabilitation framing as educational/wellness only
+
 A future web version would require a partial rebuild:
 
 ```text

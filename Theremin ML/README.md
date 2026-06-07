@@ -35,6 +35,19 @@ Optional Arduino sketch:
 
 `arduino/tof_single_sensor/tof_single_sensor.ino`
 
+Quick macOS launcher scripts:
+
+- `scripts/run_demo.command`: opens the Processing demo.
+- `scripts/train_csvs.command`: validates CSV logs and trains the TensorFlow model when data is ready.
+
+To create a local clickable launcher app:
+
+```bash
+python tools/build_macos_launcher.py
+```
+
+The generated app is saved under `dist/` and is not committed to Git.
+
 ## Processing Libraries
 
 Install these Processing libraries:
@@ -293,6 +306,8 @@ Or use the combined validation/training script:
 ```bash
 python ml/train_csvs.py
 ```
+
+The training script writes a model, feature metadata, and a JSON training report when TensorFlow dependencies are installed and the dataset is ready.
 
 See:
 

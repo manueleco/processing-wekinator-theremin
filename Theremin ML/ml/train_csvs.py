@@ -34,7 +34,10 @@ def parse_args() -> argparse.Namespace:
         help="CSV files to train from. Defaults to Processing data_logs/session-*.csv.",
     )
     parser.add_argument("--epochs", type=int, default=80)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--report", type=Path)
     parser.add_argument(
         "--allow-not-ready",
         action="store_true",
@@ -136,9 +139,15 @@ def main() -> None:
         *csv_args,
         "--epochs",
         str(args.epochs),
+        "--batch-size",
+        str(args.batch_size),
+        "--seed",
+        str(args.seed),
         "--output",
         str(args.output),
     ]
+    if args.report is not None:
+        train_command.extend(["--report", str(args.report)])
 
     print_setup_hint()
     raise SystemExit(run_command(train_command, root))

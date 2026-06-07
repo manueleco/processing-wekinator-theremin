@@ -10,6 +10,12 @@ Open:
 Theremin ML/processing_wekinator_theremin/processing_wekinator_theremin.pde
 ```
 
+Or double-click:
+
+```text
+Theremin ML/scripts/run_demo.command
+```
+
 Check:
 
 - `C` cycles input modes without freezing.
@@ -128,6 +134,12 @@ Then train the starter model:
 python ml/train_csvs.py
 ```
 
+Or double-click:
+
+```text
+scripts/train_csvs.command
+```
+
 This runs the dataset checker first. To run the two steps manually:
 
 ```bash
@@ -168,6 +180,12 @@ Use:
 
 ```text
 Processing -> File -> Export Application
+```
+
+Interim local launcher:
+
+```bash
+python tools/build_macos_launcher.py
 ```
 
 Future web version:

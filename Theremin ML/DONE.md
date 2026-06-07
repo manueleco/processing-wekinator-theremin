@@ -80,9 +80,25 @@ ml/requirements.txt
 ml/check_dataset.py
 ml/train_csvs.py
 ml/train_sensor_fusion.py
+ml/MODEL_CARD_TEMPLATE.md
+ml/DATASET_CARD_TEMPLATE.md
 ```
 
 Processing can log CSV data with `L`. The Python scripts can check dataset readiness and train a starter regression model from those logs.
+
+The TensorFlow trainer now writes a JSON report with dataset summary, metrics, training settings, and limitations.
+
+## App / Launcher Base
+
+Added:
+
+```text
+scripts/run_demo.command
+scripts/train_csvs.command
+tools/build_macos_launcher.py
+```
+
+These provide double-clickable macOS helpers and a local launcher app generator. The generated launcher app stays in `dist/` and is not committed.
 
 ## Gamification Base
 
@@ -110,6 +126,7 @@ config/exercises.json
 - macOS Processing app export checklist.
 - Dataset readiness checker for Processing CSV logs.
 - Wekinator project folder and training-notes template.
+- Model card and dataset card templates.
 
 ## Validation
 
