@@ -248,7 +248,7 @@ The project uses machine learning to adapt a musical interface to the user, tran
 
 ## Arduino and Physical Sensor Extension
 
-An Arduino can be integrated, especially with a distance sensor. A first single-sensor sketch is included in:
+An Arduino can be integrated, especially with a distance sensor. The codebase is prepared for this path, but the Arduino sensor layer is not yet hardware-validated. A first single-sensor sketch is included in:
 
 ```text
 arduino/tof_single_sensor/tof_single_sensor.ino

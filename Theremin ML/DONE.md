@@ -13,7 +13,7 @@
 - Mouse control.
 - Camera motion tracking.
 - Experimental gaze-inspired eye-region tracking.
-- Optional Arduino serial input mode.
+- Optional Arduino serial input mode prepared in Processing.
 
 ## Musical Modes
 
@@ -64,6 +64,12 @@ A,pitch_mm,volume_mm,confidence
 
 Processing reads this serial format and can use it as a physical sensor layer.
 
+Status:
+
+```text
+prepared for testing, not yet hardware-validated
+```
+
 ## TensorFlow Base
 
 Added:
@@ -93,4 +99,3 @@ config/exercises.json
 - AI training ideas.
 - Arduino sensor notes.
 - Process, done, and future-work documents.
-

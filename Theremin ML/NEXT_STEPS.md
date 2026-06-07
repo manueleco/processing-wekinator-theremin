@@ -51,7 +51,7 @@ show that Wekinator can turn noisy movement features into stable expressive musi
 
 ## 3. Add the ELEGOO / Arduino Sensor Layer
 
-If using the ELEGOO kit, first try the ultrasonic distance sensor if included.
+Arduino support is prepared in the codebase, but it has not been hardware-tested yet. If using the ELEGOO kit, first try the ultrasonic distance sensor if included.
 
 Create or use a sketch that sends:
 
@@ -171,4 +171,3 @@ Create and test an HC-SR04 Arduino sketch if the ELEGOO kit includes that sensor
 ```
 
 That will make the physical sensor-fusion part visible and more convincing for the presentation.
-

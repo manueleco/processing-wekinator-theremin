@@ -18,10 +18,10 @@ Processing sends movement and sensor features to Wekinator through OSC. Wekinato
 
 ## Core Contributions
 
-- Real-time Processing instrument with sound, visuals, camera, OSC, and optional serial input.
+- Real-time Processing instrument with sound, visuals, camera, OSC, and optional serial input prepared for hardware testing.
 - Wekinator profiles for basic mapping, expressive control, and Arduino/camera sensor fusion.
 - Musical pitch modes: continuous, chromatic, pentatonic, and `Ode to Joy`.
-- Optional Arduino VL53L1X distance-sensor layer.
+- Optional Arduino VL53L1X distance-sensor layer prepared, not yet hardware-validated.
 - CSV logging and TensorFlow starter pipeline for future model training.
 - First gamified exercise mode for note-hold practice.
 
@@ -229,7 +229,7 @@ Then press `Train` and `Run` in Wekinator. In Processing, press `W` until the HU
 
 ## Arduino Sensor Input
 
-The project can use an Arduino with a `VL53L1X` Time-of-Flight distance sensor.
+The project is prepared to use an Arduino with a `VL53L1X` Time-of-Flight distance sensor, but this path is not yet hardware-validated because the device is not available yet.
 
 The Arduino sends:
 
@@ -415,3 +415,4 @@ Project tracking docs:
 - `DONE.md`
 - `NEXT_STEPS.md`
 - `FUTURE_WORK.md`
+- `WORKING_PROMPT.md`

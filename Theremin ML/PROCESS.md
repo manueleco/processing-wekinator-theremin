@@ -17,7 +17,7 @@ Processing currently handles:
 - visual theremin interface
 - camera motion tracking
 - experimental gaze-inspired tracking
-- optional Arduino serial input
+- optional Arduino serial input prepared for hardware testing
 - OSC communication with Wekinator
 - sine/saw oscillator sound synthesis
 - chromatic, pentatonic, continuous, and melody pitch modes
@@ -69,6 +69,12 @@ camera/gesture features + physical distance sensor features
 This is the strongest justification for Wekinator: it learns how to combine noisy camera tracking with physical sensor data.
 
 ## Arduino Process
+
+Status:
+
+```text
+prepared for testing, not yet hardware-validated
+```
 
 1. Connect a VL53L1X distance sensor to Arduino.
 2. Upload `arduino/tof_single_sensor/tof_single_sensor.ino`.
