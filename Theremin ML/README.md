@@ -284,6 +284,10 @@ See:
 
 `ml/README.md`
 
+For the full Wekinator and TensorFlow data protocol, see:
+
+`TRAINING_PROTOCOL.md`
+
 ## Practice Mode
 
 Press `P` to enable a first gamified exercise.
@@ -409,10 +413,19 @@ For the more formal project framing and Arduino extension notes, see:
 
 `PROJECT_FORMALIZATION.md`
 
+For the practical demo sequence, Wekinator training protocol, and macOS app export, see:
+
+- `DEMO_PLAN.md`
+- `TRAINING_PROTOCOL.md`
+- `APP_EXPORT.md`
+
 Project tracking docs:
 
 - `PROCESS.md`
 - `DONE.md`
 - `NEXT_STEPS.md`
 - `FUTURE_WORK.md`
+- `DEMO_PLAN.md`
+- `TRAINING_PROTOCOL.md`
+- `APP_EXPORT.md`
 - `WORKING_PROMPT.md`

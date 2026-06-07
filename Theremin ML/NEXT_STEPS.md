@@ -28,6 +28,12 @@ Inputs: 6
 Outputs: 4
 ```
 
+Use the detailed checklist in:
+
+```text
+TRAINING_PROTOCOL.md
+```
+
 Train examples for:
 
 - stable low pitch
@@ -49,9 +55,11 @@ Goal:
 show that Wekinator can turn noisy movement features into stable expressive musical control
 ```
 
-## 3. Add the ELEGOO / Arduino Sensor Layer
+## 3. Keep Arduino Ready, But Optional
 
-Arduino support is prepared in the codebase, but it has not been hardware-tested yet. If using the ELEGOO kit, first try the ultrasonic distance sensor if included.
+Arduino support is prepared in the codebase, but it has not been hardware-tested yet. For the current solid demo, Arduino should remain optional and should not block the Processing/Wekinator flow.
+
+When the device is available, if using the ELEGOO kit, first try the ultrasonic distance sensor if included.
 
 Create or use a sketch that sends:
 
@@ -167,7 +175,7 @@ The web version should come after data collection and TensorFlow/TensorFlow.js w
 The next best task is:
 
 ```text
-Create and test an HC-SR04 Arduino sketch if the ELEGOO kit includes that sensor.
+Run the documented demo flow, train Wekinator 6 inputs / 4 outputs, record 2-3 real CSV sessions with L, then train the first TensorFlow model.
 ```
 
-That will make the physical sensor-fusion part visible and more convincing for the presentation.
+After that, export the Processing sketch as a macOS app and test it without Arduino connected.

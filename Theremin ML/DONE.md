@@ -99,3 +99,13 @@ config/exercises.json
 - AI training ideas.
 - Arduino sensor notes.
 - Process, done, and future-work documents.
+- Working prompt for keeping future work aligned with the project scope.
+- Demo plan for a no-Arduino Processing/Wekinator presentation.
+- Wekinator/TensorFlow training protocol.
+- macOS Processing app export checklist.
+
+## Validation
+
+- Processing sketch compile was validated from the project folder on `2026-06-07`.
+- Arduino serial remains opt-in: pressing `C` only cycles input modes, while serial retry/connect is handled by `O`.
+- The current demo path is designed to work without Arduino connected.

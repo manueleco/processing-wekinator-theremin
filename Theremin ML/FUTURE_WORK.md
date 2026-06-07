@@ -62,6 +62,12 @@ Important note: this should be presented as an educational or wellness prototype
 
 This is the most realistic deliverable for the current project.
 
+Detailed export steps live in:
+
+```text
+APP_EXPORT.md
+```
+
 Use Processing:
 
 ```text
@@ -132,4 +138,3 @@ Processing/Wekinator prototype -> collect data -> train TensorFlow -> port model
 5. Improve practice mode using `config/exercises.json`.
 6. Export a macOS Processing app for the final deliverable.
 7. Treat React/WebAudio as a future version after the course demo.
-

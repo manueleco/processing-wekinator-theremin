@@ -10,6 +10,12 @@ mouse / camera / eye-inspired tracking / Arduino sensor
 -> Processing sound synthesis and practice UI
 ```
 
+Operational guides:
+
+- `DEMO_PLAN.md`: what to show in the live demo and in what order.
+- `TRAINING_PROTOCOL.md`: how to train Wekinator `6 inputs / 4 outputs` and collect CSV data.
+- `APP_EXPORT.md`: how to export and validate a macOS Processing app.
+
 ## Processing Roles
 
 Processing currently handles:
@@ -112,6 +118,8 @@ Cycling input modes with `C` does not open serial automatically. This keeps the 
 ```bash
 python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
 ```
+
+For the current deliverable, collect at least 2-3 CSV sessions before treating the TensorFlow model as meaningful. The local smoke-test CSV files are not enough for a final trained model.
 
 ## Practice/Game Process
 
