@@ -119,11 +119,20 @@ int oscSentCount = 0;
 boolean dataLogging = false;
 PrintWriter dataLog;
 String trainingLabel = "free";
+String dataLogFilename = "";
+int dataLogRows = 0;
 boolean practiceMode = false;
 int practiceStep = 0;
 int practiceScore = 0;
 float practiceHoldSeconds = 0;
 float practiceRequiredSeconds = 0.85;
+String activeExerciseId = "ode_to_joy_note_hold";
+String activeExerciseName = "Ode to Joy Note Hold";
+String activeExerciseGoal = "Hit each note and hold it steadily.";
+boolean exerciseConfigLoaded = false;
+int[] practiceMelodyMidi;
+boolean demoGuide = false;
+int demoStep = 0;
 
 float minFreq = 160.0;
 float maxFreq = 1400.0;
@@ -163,6 +172,7 @@ void setup() {
   timbreOsc.amp(0);
 
   textFont(createFont("Arial", 16));
+  loadExerciseConfig();
 }
 
 void draw() {
@@ -726,6 +736,11 @@ void keyPressed() {
     retryArduinoSerial();
   } else if (key == 'l' || key == 'L') {
     toggleDataLogging();
+  } else if (key == 'b' || key == 'B') {
+    demoGuide = !demoGuide;
+  } else if (key == 'n' || key == 'N') {
+    demoGuide = true;
+    demoStep = (demoStep + 1) % demoStepCount();
   } else if (key == 'p' || key == 'P') {
     practiceMode = !practiceMode;
     if (practiceMode) {
@@ -805,6 +820,7 @@ void toggleDataLogging() {
       dataLog.close();
       dataLog = null;
     }
+    println("Data logging stopped: " + dataLogFilename + " rows=" + dataLogRows);
     return;
   }
 
@@ -818,13 +834,16 @@ void toggleDataLogging() {
   dataLog = createWriter(filename);
   dataLog.println(dataLogHeader());
   dataLogging = true;
+  dataLogFilename = filename;
+  dataLogRows = 0;
   println("Data logging started: " + filename);
 }
 
 String dataLogHeader() {
   return "millis,input_mode,wekinator_profile,label,input_pitch,input_volume,movement_speed,movement_acceleration,hand_confidence,sensor_noise,"
     + "arduino_pitch_mm,arduino_volume_mm,arduino_pitch_control,arduino_volume_control,arduino_speed,arduino_confidence,arduino_noise,"
-    + "weki_pitch,weki_volume,weki_vibrato,weki_brightness,target_pitch,target_volume,target_vibrato,target_brightness,current_midi_note,freq,amp";
+    + "weki_pitch,weki_volume,weki_vibrato,weki_brightness,target_pitch,target_volume,target_vibrato,target_brightness,"
+    + "practice_mode,practice_step,practice_score,practice_target_midi,exercise_id,current_midi_note,freq,amp";
 }
 
 void logDataFrame(float freq, float amp) {
@@ -857,10 +876,23 @@ void logDataFrame(float freq, float amp) {
     + nf(targetVolume, 1, 4) + ","
     + nf(targetVibrato, 1, 4) + ","
     + nf(targetBrightness, 1, 4) + ","
+    + practiceMode + ","
+    + practiceStep + ","
+    + practiceScore + ","
+    + practiceTargetMidi() + ","
+    + csvSafe(activeExerciseId) + ","
     + currentMidiNote + ","
     + nf(freq, 1, 2) + ","
     + nf(amp, 1, 4));
+  dataLogRows++;
   dataLog.flush();
+}
+
+String csvSafe(String value) {
+  if (value == null) {
+    return "";
+  }
+  return value.replace(',', '_').replace('\n', ' ').replace('\r', ' ');
 }
 
 String inputModeLabelForData() {
@@ -932,7 +964,17 @@ void updatePracticeMode() {
 }
 
 int practiceTargetMidi() {
-  return odeToJoyMidi[practiceStep % odeToJoyMidi.length];
+  if (practiceMelodyMidi == null || practiceMelodyMidi.length == 0) {
+    return odeToJoyMidi[practiceStep % odeToJoyMidi.length];
+  }
+  return practiceMelodyMidi[practiceStep % practiceMelodyMidi.length];
+}
+
+int practiceLength() {
+  if (practiceMelodyMidi == null || practiceMelodyMidi.length == 0) {
+    return odeToJoyMidi.length;
+  }
+  return practiceMelodyMidi.length;
 }
 
 void resetMotionReference() {
@@ -960,6 +1002,7 @@ void drawTheremin(float freq, float amp, boolean wekinatorIsLive) {
   drawVolumeMeter(amp);
   drawHud(freq, amp, wekinatorIsLive);
   drawPracticeOverlay();
+  drawDemoOverlay();
 }
 
 void drawInputBackground() {
@@ -1217,6 +1260,7 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
     + " / bright: " + nf(smoothBrightness, 1, 2);
   String logText = dataLogging ? "log on " + trainingLabel : "log off";
   String practiceText = practiceMode ? "practice on" : "practice off";
+  String demoText = demoGuide ? "demo guide on" : "demo guide off";
 
   fill(255);
   text("Mode: " + mode + " / " + live + testText, 24, height - 154);
@@ -1224,7 +1268,7 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   text("Freq: " + int(freq) + " Hz / Amp: " + nf(amp, 1, 3) + " / OSC: " + sendText + " / " + profileText + " / Sent: " + oscSentCount, 24, height - 110);
   text("Input: " + inputText + " / " + cameraText + " / " + arduinoText + " / " + sensorText, 24, height - 82);
   text("Expression: " + expressiveText, 24, height - 58);
-  text("Keys: C input, O Arduino, X profile, P practice, L log, W Wekinator, Q pitch, F/G sens", 24, height - 34);
+  text("Keys: C input, X profile, P practice, L log, B/N demo, W Wekinator, Q pitch, F/G sens", 24, height - 34);
 
   textAlign(RIGHT, TOP);
   fill(190);
@@ -1235,9 +1279,10 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   text("weki volume: " + nf(wekiVolume, 1, 2), width - 24, 110);
   text("weki vibrato: " + nf(wekiVibrato, 1, 2), width - 24, 132);
   text("weki brightness: " + nf(wekiBrightness, 1, 2), width - 24, 154);
-  text(logText + " / " + practiceText, width - 24, 176);
+  text(logText + " / rows " + dataLogRows + " / " + practiceText, width - 24, 176);
+  text("exercise: " + activeExerciseName + " / " + demoText, width - 24, 198);
   if (inputMode == INPUT_EYES) {
-    text("eye raw: " + nf(eyeRawX, 1, 2) + ", " + nf(eyeRawY, 1, 2), width - 24, 198);
+    text("eye raw: " + nf(eyeRawX, 1, 2) + ", " + nf(eyeRawY, 1, 2), width - 24, 220);
   }
 }
 
@@ -1275,16 +1320,223 @@ void drawPracticeOverlay() {
   fill(255);
   textAlign(CENTER, TOP);
   textSize(18);
-  text("Practice target: " + midiNoteName(targetNote), width * 0.5, panelY + 12);
+  text(activeExerciseName + ": " + midiNoteName(targetNote), width * 0.5, panelY + 12);
 
   fill(noteMatches ? color(112, 232, 163) : color(255, 194, 80));
   textSize(14);
-  text("score " + practiceScore + " / step " + (practiceStep + 1) + " of " + odeToJoyMidi.length, width * 0.5, panelY + 40);
+  text("score " + practiceScore + " / step " + (practiceStep + 1) + " of " + practiceLength(), width * 0.5, panelY + 40);
 
   fill(255, 255, 255, 45);
   rect(panelX + 28, panelY + 68, panelW - 56, 10, 5);
   fill(noteMatches ? color(112, 232, 163) : color(255, 194, 80));
   rect(panelX + 28, panelY + 68, (panelW - 56) * progress, 10, 5);
+}
+
+void drawDemoOverlay() {
+  if (!demoGuide) {
+    return;
+  }
+
+  float panelW = 430;
+  float panelH = 146;
+  float panelX = 24;
+  float panelY = 112;
+
+  noStroke();
+  fill(12, 17, 24, 226);
+  rect(panelX, panelY, panelW, panelH, 7);
+
+  fill(255);
+  textAlign(LEFT, TOP);
+  textSize(16);
+  text("Demo " + (demoStep + 1) + "/" + demoStepCount() + ": " + demoStepTitle(), panelX + 18, panelY + 14);
+
+  fill(205);
+  textSize(13);
+  text("Setup: " + demoStepSetup(), panelX + 18, panelY + 42);
+  text("Show: " + demoStepAction(), panelX + 18, panelY + 66);
+  text("Why: " + demoStepPurpose(), panelX + 18, panelY + 90);
+
+  fill(160);
+  text("N next step / B hide guide", panelX + 18, panelY + 118);
+}
+
+int demoStepCount() {
+  return 5;
+}
+
+String demoStepTitle() {
+  if (demoStep == 1) {
+    return "Precise notes";
+  }
+  if (demoStep == 2) {
+    return "Guided melody";
+  }
+  if (demoStep == 3) {
+    return "Practice game";
+  }
+  if (demoStep == 4) {
+    return "Wekinator expression";
+  }
+  return "Direct theremin";
+}
+
+String demoStepSetup() {
+  if (demoStep == 1) {
+    return "Press Q until Pitch: chromatic.";
+  }
+  if (demoStep == 2) {
+    return "Press Q until Pitch: ode to joy.";
+  }
+  if (demoStep == 3) {
+    return "Press P for practice mode.";
+  }
+  if (demoStep == 4) {
+    return "Press X for expressive 6x4, train Wekinator, then press W.";
+  }
+  return "Use mouse hand, DIRECT PREVIEW, sound on with M.";
+}
+
+String demoStepAction() {
+  if (demoStep == 1) {
+    return "Move horizontally and point out exact note names.";
+  }
+  if (demoStep == 2) {
+    return "Move across the pitch field to discover the melody.";
+  }
+  if (demoStep == 3) {
+    return "Hit and hold each target note until score advances.";
+  }
+  if (demoStep == 4) {
+    return "Compare learned stabilization, vibrato, and brightness.";
+  }
+  return "Move near/far from antennas for pitch and volume.";
+}
+
+String demoStepPurpose() {
+  if (demoStep == 1) {
+    return "Shows musical precision instead of random frequencies.";
+  }
+  if (demoStep == 2) {
+    return "Frames control as melody learning.";
+  }
+  if (demoStep == 3) {
+    return "Connects music control with gamified exercise.";
+  }
+  if (demoStep == 4) {
+    return "Shows AI as personalized expressive mapping.";
+  }
+  return "Establishes the fixed baseline before ML.";
+}
+
+void loadExerciseConfig() {
+  practiceMelodyMidi = subset(odeToJoyMidi, 0, odeToJoyMidi.length);
+
+  try {
+    File configFile = new File(sketchPath("../config/exercises.json"));
+    if (!configFile.exists()) {
+      println("Exercise config not found, using built-in Ode to Joy practice.");
+      return;
+    }
+
+    JSONObject config = loadJSONObject(configFile.getAbsolutePath());
+    JSONArray exercises = config.getJSONArray("exercises");
+    if (exercises == null) {
+      return;
+    }
+
+    for (int i = 0; i < exercises.size(); i++) {
+      JSONObject exercise = exercises.getJSONObject(i);
+      if (!"melody_hold".equals(jsonString(exercise, "type", ""))) {
+        continue;
+      }
+
+      JSONArray notes = exercise.getJSONArray("targetNotes");
+      if (notes == null || notes.size() == 0) {
+        continue;
+      }
+
+      int[] parsedNotes = new int[notes.size()];
+      for (int n = 0; n < notes.size(); n++) {
+        parsedNotes[n] = midiFromNoteName(notes.getString(n));
+      }
+
+      practiceMelodyMidi = parsedNotes;
+      activeExerciseId = jsonString(exercise, "id", activeExerciseId);
+      activeExerciseName = jsonString(exercise, "name", activeExerciseName);
+      activeExerciseGoal = jsonString(exercise, "goal", activeExerciseGoal);
+      practiceRequiredSeconds = jsonFloat(exercise, "holdSeconds", practiceRequiredSeconds);
+      exerciseConfigLoaded = true;
+      println("Loaded exercise: " + activeExerciseName + " notes=" + practiceMelodyMidi.length);
+      return;
+    }
+  } catch (Exception e) {
+    println("Exercise config could not be loaded: " + e.getMessage());
+  }
+}
+
+String jsonString(JSONObject object, String key, String fallback) {
+  try {
+    if (object != null && object.hasKey(key)) {
+      return object.getString(key);
+    }
+  } catch (Exception e) {
+  }
+  return fallback;
+}
+
+float jsonFloat(JSONObject object, String key, float fallback) {
+  try {
+    if (object != null && object.hasKey(key)) {
+      return object.getFloat(key);
+    }
+  } catch (Exception e) {
+  }
+  return fallback;
+}
+
+int midiFromNoteName(String noteName) {
+  if (noteName == null) {
+    return 60;
+  }
+
+  String value = trim(noteName).toUpperCase();
+  if (value.length() < 2) {
+    return 60;
+  }
+
+  int semitone = 0;
+  char note = value.charAt(0);
+  if (note == 'D') {
+    semitone = 2;
+  } else if (note == 'E') {
+    semitone = 4;
+  } else if (note == 'F') {
+    semitone = 5;
+  } else if (note == 'G') {
+    semitone = 7;
+  } else if (note == 'A') {
+    semitone = 9;
+  } else if (note == 'B') {
+    semitone = 11;
+  }
+
+  int index = 1;
+  if (index < value.length() && value.charAt(index) == '#') {
+    semitone++;
+    index++;
+  } else if (index < value.length() && value.charAt(index) == 'B') {
+    semitone--;
+    index++;
+  }
+
+  int octave = 4;
+  try {
+    octave = Integer.parseInt(value.substring(index));
+  } catch (Exception e) {
+  }
+
+  return constrain((octave + 1) * 12 + semitone, 0, 127);
 }
 
 String wekinatorProfileLabel() {

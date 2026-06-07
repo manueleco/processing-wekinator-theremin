@@ -174,6 +174,8 @@ camera/movement estimate + physical distance sensor -> stable expressive musical
 - `T`: test tone.
 - `P`: practice/game mode.
 - `L`: start/stop CSV data logging for TensorFlow.
+- `B`: show/hide the on-screen demo guide.
+- `N`: advance the on-screen demo guide to the next step.
 - `E`: calibrate eye center while looking straight ahead.
 - `R`: recalibrate camera motion background, or eye center in eye mode.
 - `V`: mirror camera.
@@ -280,6 +282,12 @@ Train the starter TensorFlow model with:
 python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
 ```
 
+Before training, check whether the recorded CSV files are ready:
+
+```bash
+python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
+```
+
 See:
 
 `ml/README.md`
@@ -292,13 +300,27 @@ For the full Wekinator and TensorFlow data protocol, see:
 
 Press `P` to enable a first gamified exercise.
 
-The sketch switches to chromatic mode and asks the user to hit and hold target notes from `Ode to Joy`.
-
-This is the first step toward configurable music/physiotherapy-style exercises. A draft configuration lives in:
+The sketch loads the first `melody_hold` exercise from:
 
 ```text
 config/exercises.json
 ```
+
+By default it switches to chromatic mode and asks the user to hit and hold target notes from `Ode to Joy`.
+
+This is the first step toward configurable music/physiotherapy-style exercises.
+
+## Demo Guide
+
+Press `B` to show or hide the on-screen demo guide.
+
+Press `N` to advance through:
+
+```text
+direct theremin -> chromatic notes -> guided melody -> practice game -> Wekinator expression
+```
+
+This keeps the live presentation aligned with `DEMO_PLAN.md`.
 
 ## MacBook Pro Camera Notes
 
@@ -429,3 +451,7 @@ Project tracking docs:
 - `TRAINING_PROTOCOL.md`
 - `APP_EXPORT.md`
 - `WORKING_PROMPT.md`
+
+Trained Wekinator projects can be documented under:
+
+`wekinator_projects/`

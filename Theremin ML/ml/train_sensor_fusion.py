@@ -10,10 +10,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
-import tensorflow as tf
-
 
 FEATURE_COLUMNS = [
     "input_pitch",
@@ -36,7 +32,20 @@ TARGET_COLUMNS = [
 ]
 
 
-def load_dataset(paths: list[Path]) -> pd.DataFrame:
+def import_ml_dependencies():
+    try:
+        import numpy as np  # type: ignore
+        import pandas as pd  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise SystemExit(
+            "Python ML dependencies are not installed in this environment.\n"
+            'Run: cd "Theremin ML" && python3 -m venv .venv && '
+            "source .venv/bin/activate && pip install -r ml/requirements.txt"
+        ) from exc
+    return np, pd
+
+
+def load_dataset(paths: list[Path], np, pd):
     frames = []
     for path in paths:
         frames.append(pd.read_csv(path))
@@ -57,7 +66,19 @@ def load_dataset(paths: list[Path]) -> pd.DataFrame:
     return data
 
 
-def build_model(normalizer: tf.keras.layers.Normalization) -> tf.keras.Model:
+def import_tensorflow():
+    try:
+        import tensorflow as tf  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise SystemExit(
+            "TensorFlow is not installed in this Python environment.\n"
+            'Run: cd "Theremin ML" && python3 -m venv .venv && '
+            "source .venv/bin/activate && pip install -r ml/requirements.txt"
+        ) from exc
+    return tf
+
+
+def build_model(tf, normalizer):
     model = tf.keras.Sequential(
         [
             tf.keras.Input(shape=(len(FEATURE_COLUMNS),)),
@@ -83,7 +104,9 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("ml/models/sensor_fusion_model.keras"))
     args = parser.parse_args()
 
-    data = load_dataset(args.csv)
+    np, pd = import_ml_dependencies()
+    tf = import_tensorflow()
+    data = load_dataset(args.csv, np, pd)
     shuffled = data.sample(frac=1.0, random_state=42).reset_index(drop=True)
 
     split_index = int(len(shuffled) * 0.8)
@@ -98,7 +121,7 @@ def main() -> None:
     normalizer = tf.keras.layers.Normalization()
     normalizer.adapt(x_train)
 
-    model = build_model(normalizer)
+    model = build_model(tf, normalizer)
     model.fit(
         x_train,
         y_train,
@@ -130,4 +153,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

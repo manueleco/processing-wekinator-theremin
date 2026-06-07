@@ -15,6 +15,8 @@ Check:
 - `C` cycles input modes without freezing.
 - `Q` cycles pitch modes: continuous, chromatic, pentatonic, Ode to Joy.
 - `P` starts practice mode.
+- `B` toggles the on-screen demo guide.
+- `N` advances the demo guide.
 - `X` cycles Wekinator profiles.
 - `W` toggles direct preview / Wekinator.
 - `O` only tries Arduino serial when explicitly pressed.
@@ -123,6 +125,12 @@ Use labels:
 Then train the starter model:
 
 ```bash
+python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
+```
+
+If the checker says `ready=true`, train:
+
+```bash
 python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
 ```
 
@@ -141,7 +149,6 @@ Current:
 
 Next:
 
-- load `config/exercises.json` from Processing
 - add configurable exercises
 - add score history
 - add stability/noise scoring

@@ -47,7 +47,7 @@ Use number keys to label the current recording context:
 
 ## Install
 
-From the repo root:
+From the `Theremin ML` folder:
 
 ```bash
 python3 -m venv .venv
@@ -57,7 +57,22 @@ pip install -r ml/requirements.txt
 
 ## Train
 
-After collecting one or more CSV files:
+After collecting CSV files, first check whether the dataset is ready:
+
+```bash
+python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
+```
+
+The first real model should have:
+
+```text
+3+ CSV files
+3000+ rows
+4+ labels
+clear variation in pitch, volume, movement speed, and noise
+```
+
+If the checker says `ready=true`, train:
 
 ```bash
 python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
@@ -77,6 +92,8 @@ Outputs are saved under:
 ```text
 ml/models/
 ```
+
+If TensorFlow is not installed, the training script will print the virtual-environment install command instead of failing with an unclear import error.
 
 ## What the Model Learns
 
@@ -119,4 +136,3 @@ tensorflowjs_converter --input_format=keras ml/models/sensor_fusion_model.keras 
 ```
 
 That would allow a React/WebAudio version to run a similar model in the browser.
-

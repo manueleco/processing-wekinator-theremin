@@ -50,11 +50,19 @@ Output port: 12000
 | `W` | direct preview / Wekinator mode |
 | `P` | practice mode |
 | `L` | CSV data logging |
+| `B` | show/hide on-screen demo guide |
+| `N` | move to the next demo guide step |
 | `O` | Arduino retry, only if hardware is connected |
 
 ## Demo Sequence
 
 ### 1. Direct Theremin
+
+Optional:
+
+```text
+Press B to show the demo guide and N to move through the steps.
+```
 
 Use:
 

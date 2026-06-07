@@ -107,6 +107,12 @@ If committed, document:
 - intended behavior
 - limitations
 
+A notes template is available in:
+
+```text
+wekinator_projects/expressive_6x4/README.md
+```
+
 ## 8. CSV Data Collection for TensorFlow
 
 In Processing, press `L` to start/stop logging.
@@ -150,6 +156,13 @@ The current local CSV logs are useful as a smoke test, but they are not a comple
 ## 10. TensorFlow Training
 
 After collecting data:
+
+```bash
+cd "Theremin ML"
+python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
+```
+
+If the checker says `ready=true`, train:
 
 ```bash
 cd "Theremin ML"

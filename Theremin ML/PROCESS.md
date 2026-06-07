@@ -28,7 +28,8 @@ Processing currently handles:
 - sine/saw oscillator sound synthesis
 - chromatic, pentatonic, continuous, and melody pitch modes
 - CSV data logging for future TensorFlow training
-- a first practice/game mode for note-hold exercises
+- a practice/game mode that loads the first `melody_hold` exercise from `config/exercises.json`
+- an on-screen demo guide for the presentation flow
 
 ## Wekinator Roles
 
@@ -113,7 +114,13 @@ Cycling input modes with `C` does not open serial automatically. This keeps the 
 
 4. Perform examples with mouse, camera, eye mode, or Arduino.
 5. Press `L` again to stop logging.
-6. Train the TensorFlow starter model:
+6. Check the dataset:
+
+```bash
+python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
+```
+
+7. Train the TensorFlow starter model:
 
 ```bash
 python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
@@ -135,10 +142,10 @@ This is the base for future configurable exercises:
 - stability training
 - expressive vibrato training
 
-Draft configuration lives in:
+Exercise configuration lives in:
 
 ```text
 config/exercises.json
 ```
 
-The Processing sketch does not load this JSON yet. It documents the planned configurable structure.
+The Processing sketch currently loads the first `melody_hold` exercise from this file. Other exercise types remain documented for future implementation.

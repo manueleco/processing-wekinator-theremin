@@ -286,7 +286,7 @@ This supports a one-sensor version immediately and a two-sensor version later.
 
 ## Gamification and Rehabilitation-Style Exercises
 
-The project now includes a first practice mode. Press `P` in Processing to start a note-hold game based on `Ode to Joy`.
+The project now includes a first configurable practice mode. Press `P` in Processing to start the first `melody_hold` exercise loaded from `config/exercises.json`.
 
 The purpose is to turn musical control into a measurable task:
 
@@ -304,7 +304,7 @@ This can be extended toward physiotherapy-style exercises by configuring:
 - rest intervals
 - progress scoring
 
-A draft exercise configuration exists in:
+The current exercise configuration lives in:
 
 ```text
 config/exercises.json

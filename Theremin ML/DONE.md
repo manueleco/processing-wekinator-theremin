@@ -86,11 +86,14 @@ Processing can log CSV data with `L`. The Python script can train a starter regr
 
 - Added practice mode with `P`.
 - The first game asks the user to hit and hold target notes from `Ode to Joy`.
-- Added a draft exercise config:
+- Added an exercise config:
 
 ```text
 config/exercises.json
 ```
+
+- Processing loads the first `melody_hold` exercise from the config.
+- Added an on-screen demo guide toggled with `B` and advanced with `N`.
 
 ## Documentation
 
@@ -103,6 +106,8 @@ config/exercises.json
 - Demo plan for a no-Arduino Processing/Wekinator presentation.
 - Wekinator/TensorFlow training protocol.
 - macOS Processing app export checklist.
+- Dataset readiness checker for Processing CSV logs.
+- Wekinator project folder and training-notes template.
 
 ## Validation
 

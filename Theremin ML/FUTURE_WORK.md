@@ -135,6 +135,6 @@ Processing/Wekinator prototype -> collect data -> train TensorFlow -> port model
 2. Record sensor-fusion CSV data.
 3. Train the starter TensorFlow regression model.
 4. Compare Wekinator output vs TensorFlow output offline.
-5. Improve practice mode using `config/exercises.json`.
+5. Add more exercise types beyond the current `melody_hold` config.
 6. Export a macOS Processing app for the final deliverable.
 7. Treat React/WebAudio as a future version after the course demo.
