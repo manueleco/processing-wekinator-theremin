@@ -450,6 +450,7 @@ Project tracking docs:
 - `DEMO_PLAN.md`
 - `TRAINING_PROTOCOL.md`
 - `APP_EXPORT.md`
+- `GIT_BRANCHING.md`
 - `WORKING_PROMPT.md`
 
 Trained Wekinator projects can be documented under:
