@@ -125,12 +125,13 @@ Use labels:
 Then train the starter model:
 
 ```bash
-python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
+python ml/train_csvs.py
 ```
 
-If the checker says `ready=true`, train:
+This runs the dataset checker first. To run the two steps manually:
 
 ```bash
+python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
 python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
 ```
 

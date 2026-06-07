@@ -155,17 +155,20 @@ The current local CSV logs are useful as a smoke test, but they are not a comple
 
 ## 10. TensorFlow Training
 
-After collecting data:
+After collecting data, use the combined validation/training script:
+
+```bash
+cd "Theremin ML"
+python ml/train_csvs.py
+```
+
+This runs `ml/check_dataset.py` first. If the dataset is ready, it then runs `ml/train_sensor_fusion.py`.
+
+Manual version:
 
 ```bash
 cd "Theremin ML"
 python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
-```
-
-If the checker says `ready=true`, train:
-
-```bash
-cd "Theremin ML"
 python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
 ```
 

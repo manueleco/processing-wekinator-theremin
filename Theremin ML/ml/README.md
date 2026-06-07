@@ -57,7 +57,15 @@ pip install -r ml/requirements.txt
 
 ## Train
 
-After collecting CSV files, first check whether the dataset is ready:
+After collecting CSV files, the simplest path is:
+
+```bash
+python ml/train_csvs.py
+```
+
+This validates the CSV files first and then trains only when the dataset is ready.
+
+To run the two steps manually, first check whether the dataset is ready:
 
 ```bash
 python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
@@ -76,6 +84,12 @@ If the checker says `ready=true`, train:
 
 ```bash
 python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
+```
+
+For a quick smoke test on an incomplete dataset:
+
+```bash
+python ml/train_csvs.py --allow-not-ready --epochs 5
 ```
 
 The script trains a regression model with these targets:

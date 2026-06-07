@@ -123,7 +123,7 @@ python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
 7. Train the TensorFlow starter model:
 
 ```bash
-python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
+python ml/train_csvs.py
 ```
 
 For the current deliverable, collect at least 2-3 CSV sessions before treating the TensorFlow model as meaningful. The local smoke-test CSV files are not enough for a final trained model.

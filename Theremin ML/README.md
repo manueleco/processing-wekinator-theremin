@@ -288,6 +288,12 @@ Before training, check whether the recorded CSV files are ready:
 python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
 ```
 
+Or use the combined validation/training script:
+
+```bash
+python ml/train_csvs.py
+```
+
 See:
 
 `ml/README.md`

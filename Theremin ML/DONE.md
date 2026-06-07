@@ -77,10 +77,12 @@ Added:
 ```text
 ml/README.md
 ml/requirements.txt
+ml/check_dataset.py
+ml/train_csvs.py
 ml/train_sensor_fusion.py
 ```
 
-Processing can log CSV data with `L`. The Python script can train a starter regression model from those logs.
+Processing can log CSV data with `L`. The Python scripts can check dataset readiness and train a starter regression model from those logs.
 
 ## Gamification Base
 
