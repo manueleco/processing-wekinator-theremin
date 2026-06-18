@@ -2,7 +2,7 @@
 """Train a starter TensorFlow regression model for sensor-fusion control.
 
 Usage:
-    python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
+    python ml/train_sensor_fusion.py apps/processing_wekinator/processing_wekinator_theremin/data_logs/session-*.csv
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-FEATURE_COLUMNS = [
+BASE_FEATURE_COLUMNS = [
     "input_pitch",
     "input_volume",
     "movement_speed",
@@ -25,6 +25,19 @@ FEATURE_COLUMNS = [
     "arduino_speed",
     "arduino_confidence",
 ]
+
+OPTIONAL_FEATURE_COLUMNS = [
+    "melody_step_speed",
+    "trajectory_score",
+    "trajectory_distance",
+    "trajectory_reps",
+    "trajectory_tolerance",
+    "trajectory_smoothness",
+    "trajectory_path_length",
+    "trajectory_direction_changes",
+]
+
+FEATURE_COLUMNS = BASE_FEATURE_COLUMNS + OPTIONAL_FEATURE_COLUMNS
 
 TARGET_COLUMNS = [
     "target_pitch",
@@ -56,9 +69,13 @@ def load_dataset(paths: list[Path], np, pd):
         raise SystemExit("No CSV files were provided.")
 
     data = pd.concat(frames, ignore_index=True)
-    missing = [column for column in FEATURE_COLUMNS + TARGET_COLUMNS if column not in data.columns]
+    missing = [column for column in BASE_FEATURE_COLUMNS + TARGET_COLUMNS if column not in data.columns]
     if missing:
         raise SystemExit(f"Dataset is missing required columns: {', '.join(missing)}")
+
+    for column in OPTIONAL_FEATURE_COLUMNS:
+        if column not in data.columns:
+            data[column] = 0.0
 
     data = data.replace([np.inf, -np.inf], np.nan)
     data = data.dropna(subset=FEATURE_COLUMNS + TARGET_COLUMNS)

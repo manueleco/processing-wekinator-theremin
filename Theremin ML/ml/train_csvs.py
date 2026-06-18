@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 
-DEFAULT_CSV_GLOB = "processing_wekinator_theremin/data_logs/session-*.csv"
+DEFAULT_CSV_GLOB = "apps/processing_wekinator/processing_wekinator_theremin/data_logs/session-*.csv"
 DEFAULT_OUTPUT = Path("ml/models/sensor_fusion_model.keras")
 
 

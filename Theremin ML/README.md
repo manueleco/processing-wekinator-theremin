@@ -2,478 +2,314 @@
 
 ## Abstract
 
-Adaptive Expressive Theremin is an interactive machine-learning musical interface built with Processing and Wekinator. The project extends the idea of a virtual theremin by combining camera-based movement tracking, experimental gaze-inspired control, optional Arduino distance sensing, and real-time supervised learning. Instead of using only fixed rules such as `position -> pitch`, the system can train Wekinator to transform noisy and personal movement data into stable musical controls such as pitch, volume, vibrato, and timbre brightness.
+Adaptive Expressive Theremin is a machine-learning musical interface that turns movement into sound, practice feedback, and expressive control. The main application is built in Processing and communicates with Wekinator through OSC so a performer can compare a fixed theremin mapping against a learned, personalized mapping.
 
-The project explores how musical interaction can become more adaptive, expressive, and accessible. It includes chromatic pitch quantization for precise notes, an `Ode to Joy` melody mode for guided musical practice, a first gamified note-hold exercise, CSV data logging for future TensorFlow experiments, and an Arduino sensor-fusion path for matching physical distance sensing with camera/movement features. The work is framed as an educational and creative prototype, with possible extensions toward rehabilitation-style exercises, personalized motor-control practice, and browser or macOS app delivery.
+The project extends a virtual theremin with chromatic notes, an `Ode to Joy` melody game, camera or mouse control, Wekinator 6-input / 4-output expressive training, CSV logging for TensorFlow experiments, and DTW-scored trajectory exercises that can be framed as educational or rehabilitation-style movement tasks.
 
-## Project Overview
+This is an educational creative-technology prototype, not a medical device.
 
-The sketch simulates a theremin with two virtual antennas:
+## What It Demonstrates
 
-- A vertical pitch antenna on the right.
-- A volume loop on the left.
-- A virtual hand controlled by the mouse, camera motion detection, experimental eye-motion detection, or optional Arduino distance sensing.
+- Musical control: movement controls pitch, volume, vibrato, and brightness.
+- Sensor learning: Wekinator maps noisy movement features to stable expressive outputs.
+- Precision: chromatic quantization makes notes musically exact instead of random frequencies.
+- Gamified practice: `Ode to Joy` note targets and trajectory-following exercises give measurable goals.
+- Rehabilitation-style feedback: trajectory score, detected gesture, smoothness, repetitions, and configurable difficulty.
+- AI scalability: CSV logs can train an offline TensorFlow regression model for future apps.
+- App delivery: the project includes a Processing demo launcher and a Python companion app base.
 
-Processing sends movement and sensor features to Wekinator through OSC. Wekinator learns a continuous mapping and sends back musical controls, which Processing turns into sound and reactive visuals.
+## Project Structure
 
-## Core Contributions
+```text
+Theremin ML/
+  Adaptive Expressive Theremin.command
+  apps/
+    processing_wekinator/      main Processing + Wekinator demo
+    python_rehab/              Python hand-tracking + DTW trajectory app
+  config/
+    exercises.json             shared melody and trajectory exercise config
+  ml/
+    check_dataset.py           CSV readiness checker
+    train_csvs.py              one-command TensorFlow training wrapper
+    train_sensor_fusion.py     Keras regression trainer
+  scripts/
+    run_demo.command           macOS double-click launcher for Processing
+    train_csvs.command         macOS double-click TensorFlow trainer
+    train_wekinator_demo.command
+  tools/
+    build_macos_launcher.py    local macOS launcher app generator
+    train_wekinator_demo.py    bootstrap Wekinator trainer
+    probe_wekinator_outputs.py
+  wekinator_projects/
+    thereminwekinator/         saved bootstrap-trained Wekinator project
+```
 
-- Real-time Processing instrument with sound, visuals, camera, OSC, and optional serial input prepared for hardware testing.
-- Wekinator profiles for basic mapping, expressive control, and Arduino/camera sensor fusion.
-- Musical pitch modes: continuous, chromatic, pentatonic, and `Ode to Joy`.
-- Optional Arduino VL53L1X distance-sensor layer prepared, not yet hardware-validated.
-- CSV logging and TensorFlow starter pipeline for future model training.
-- First gamified exercise mode for note-hold practice.
+## Project Phases
 
-## Main Sketch
+### Phase 1: Stable Live Demo
+
+Goal:
+
+```text
+prove the instrument works without Arduino
+```
+
+Deliverables:
+
+- Processing sketch launches from the root executable.
+- Mouse and keyboard trainer control are reliable.
+- Chromatic, `Ode to Joy`, melody game, and trajectory rehab modes can be demonstrated.
+- Wekinator expressive `6 inputs / 4 outputs` project can run as the live ML layer.
+
+### Phase 2: Data Collection and First Model
+
+Goal:
+
+```text
+turn the demo into a measurable ML experiment
+```
+
+Deliverables:
+
+- Record 2-3 real CSV sessions with `L`.
+- Include stable, expressive, noisy, melody, and trajectory examples.
+- Run dataset validation.
+- Train the first TensorFlow/Keras regression model.
+- Save a model report and document limitations.
+
+### Phase 3: ML Orchestrator
+
+Goal:
+
+```text
+make training and evaluation easier to repeat
+```
+
+Deliverables:
+
+- Add a Python orchestrator that checks CSV quality, runs training, compares metrics, and writes model/dataset cards.
+- Optionally add a workflow helper to recommend the next data collection step.
+- Keep agent decisions outside the real-time audio loop.
+
+### Phase 4: Product-Style App
+
+Goal:
+
+```text
+package the experience as a cleaner application
+```
+
+Deliverables:
+
+- Export the Processing macOS app or ship the launcher for the course demo.
+- Mature the Python rehab app into a more complete hand-tracking interface.
+- Add session history, exercise configuration, and clearer user-facing settings.
+
+### Phase 5: Future Deployment Paths
+
+Goal:
+
+```text
+explore scalable versions after the presentation
+```
+
+Deliverables:
+
+- TensorFlow.js or TFLite export.
+- Web app prototype with React/WebAudio if needed.
+- Optional Arduino/sensor-fusion layer when hardware is available.
+
+## Main Demo
 
 Open this sketch in Processing:
 
-`processing_wekinator_theremin/processing_wekinator_theremin.pde`
-
-Optional Arduino sketch:
-
-`arduino/tof_single_sensor/tof_single_sensor.ino`
-
-Quick macOS launcher scripts:
-
-- `scripts/run_demo.command`: opens the Processing demo.
-- `scripts/train_csvs.command`: validates CSV logs and trains the TensorFlow model when data is ready.
-
-To create a local clickable launcher app:
-
-```bash
-python tools/build_macos_launcher.py
+```text
+apps/processing_wekinator/processing_wekinator_theremin/processing_wekinator_theremin.pde
 ```
 
-The generated app is saved under `dist/` and is not committed to Git.
+Or double-click on macOS:
 
-## Processing Libraries
+```text
+Adaptive Expressive Theremin.command
+```
 
-Install these Processing libraries:
+Alternative launcher:
+
+```text
+scripts/run_demo.command
+```
+
+Processing libraries required:
 
 - `oscP5`
 - `Sound`
 - `Video Library for Processing 4`
 
-In this machine they are installed under:
-
-`~/Documents/Processing/libraries`
-
-If Processing says `No library found for processing.video`, fully quit Processing with `Cmd+Q` and reopen it. Processing only scans contributed libraries when the app starts. Also check:
-
-`Processing > Settings/Preferences > Sketchbook location`
-
-It should point to:
-
-`/Users/meco/Documents/Processing`
-
-The mixed sketch imports `processing.video.*` at compile time, so the `Video Library for Processing 4` must be installed even when using the mouse input mode.
+The safest presentation path works without Arduino. Start with mouse or keyboard trainer input, then use camera only if macOS permissions are already working.
 
 ## Wekinator Setup
 
-### Basic Profile
-
-Create a new Wekinator project:
-
-- Inputs: `2`
-- Outputs: `2`
-- Output type: `All continuous`
-- Input OSC message: `/wek/inputs`
-- Input OSC port: `6448`
-- Output OSC message: `/wek/outputs`
-- Output host: `localhost`
-- Output port: `12000`
-
-Meaning of the inputs:
-
-- Input 1: proximity to the pitch antenna.
-- Input 2: distance from the volume loop.
-
-Meaning of the outputs:
-
-- Output 1: pitch, from `0.0` to `1.0`.
-- Output 2: volume, from `0.0` to `1.0`.
-
-### Expressive Profile
-
-The sketch also includes an optional expressive Wekinator profile. Press `X` in Processing to switch between:
-
-- `basic OSC: 2 inputs / 2 outputs`
-- `expressive OSC: 6 inputs / 4 outputs`
-- `fusion OSC: 10 inputs / 4 outputs`
-
-For the expressive profile, create a Wekinator project with:
-
-- Inputs: `6`
-- Outputs: `4`
-- Output type: `All continuous`
-- Input OSC message: `/wek/inputs`
-- Input OSC port: `6448`
-- Output OSC message: `/wek/outputs`
-- Output host: `localhost`
-- Output port: `12000`
-
-Expressive inputs:
-
-| Input | Meaning |
-| ---: | --- |
-| 1 | pitch antenna proximity |
-| 2 | volume loop distance |
-| 3 | movement speed |
-| 4 | movement acceleration |
-| 5 | tracking confidence |
-| 6 | estimated sensor noise / instability |
-
-Expressive outputs:
-
-| Output | Meaning |
-| ---: | --- |
-| 1 | stabilized pitch or melody position |
-| 2 | stabilized volume |
-| 3 | vibrato amount |
-| 4 | timbre brightness |
-
-This gives Wekinator a stronger role: it learns how to convert noisy movement features into stable and expressive musical control.
-
-### Sensor-Fusion Profile
-
-Use this profile when Arduino distance sensing is connected. Press `X` until the HUD says:
+Use the expressive profile for the main AI demo:
 
 ```text
-fusion OSC: 10 inputs / 4 outputs
+Inputs: 6
+Outputs: 4
+Input OSC message: /wek/inputs
+Input OSC port: 6448
+Output OSC message: /wek/outputs
+Output host: localhost
+Output port: 12000
+Output type: All continuous
 ```
 
-Create a Wekinator project with:
-
-- Inputs: `10`
-- Outputs: `4`
-- Output type: `All continuous`
-- Input OSC message: `/wek/inputs`
-- Input OSC port: `6448`
-- Output OSC message: `/wek/outputs`
-- Output host: `localhost`
-- Output port: `12000`
-
-Fusion inputs:
-
-| Input | Meaning |
-| ---: | --- |
-| 1 | pitch antenna proximity |
-| 2 | volume loop distance |
-| 3 | movement speed |
-| 4 | movement acceleration |
-| 5 | tracking confidence |
-| 6 | camera/tracking noise |
-| 7 | Arduino pitch distance mapped to `0..1` |
-| 8 | Arduino volume distance mapped to `0..1` |
-| 9 | Arduino sensor speed |
-| 10 | Arduino sensor confidence |
-
-This profile lets Wekinator act as a sensor-fusion layer:
+Inputs:
 
 ```text
-camera/movement estimate + physical distance sensor -> stable expressive musical control
+pitch proximity, volume distance, movement speed, acceleration, confidence, noise
 ```
 
-## Controls
-
-- `C`: switch input mode, mouse hand / camera motion / eye motion / Arduino sensor.
-- `M`: mute / unmute.
-- `W`: direct preview / Wekinator mode.
-- `O`: connect / retry Arduino serial.
-- `X`: switch Wekinator OSC profile, basic 2x2 / expressive 6x4 / fusion 10x4.
-- `Q`: continuous pitch / chromatic pitch / pentatonic pitch / Ode to Joy pitch.
-- `T`: test tone.
-- `P`: practice/game mode.
-- `L`: start/stop CSV data logging for TensorFlow.
-- `B`: show/hide the on-screen demo guide.
-- `N`: advance the on-screen demo guide to the next step.
-- `E`: calibrate eye center while looking straight ahead.
-- `R`: recalibrate camera motion background, or eye center in eye mode.
-- `V`: mirror camera.
-- `F` and `G`: decrease / increase sensor sensitivity.
-  In camera motion mode this changes the motion threshold. In eye mode this changes gaze gain.
-- `H` and `Y`: decrease / increase vertical gaze gain in eye mode.
-- `A` and `D`: decrease / increase dark-pixel threshold in eye mode.
-
-## Chromatic Pitch Mode
-
-Press `Q` until the HUD says `Pitch: chromatic`.
-
-In this mode, the pitch axis snaps to precise chromatic MIDI notes instead of producing arbitrary continuous frequencies. This makes the instrument more musically controlled while still allowing expressive movement.
-
-The current chromatic range is:
+Outputs:
 
 ```text
-C3 to C6
+corrected pitch, corrected volume, vibrato amount, timbre brightness
 ```
 
-The HUD shows the current note name, for example `C4`, `F#4`, or `A5`.
-
-This is the best mode when the goal is accurate notes rather than free theremin glissando.
-
-## Ode to Joy Pitch Mode
-
-Press `Q` until the HUD says `Pitch: ode to joy`.
-
-In this mode, the pitch axis does not play arbitrary continuous frequencies. Instead, it steps through a simplified first phrase of Beethoven's `Ode to Joy`:
-
-`E E F G G F E D C C D E E D D`
-
-This gives the instrument a hidden performance objective: move the virtual hand or gaze from left to right to discover and reproduce the melody, while using distance from the volume loop for dynamics.
-
-The Wekinator model can still control this mode. That means the learned gesture mapping chooses the melody step and volume, while Processing constrains the sound to the selected musical material.
-
-## Training Example
-
-Record 1-2 seconds for each example in Wekinator:
-
-| Gesture | Pitch | Volume |
-| --- | ---: | ---: |
-| hand on the left volume loop | 0.0 | 0.0 |
-| hand far from loop and far from pitch antenna | 0.15 | 0.8 |
-| hand in the center | 0.45 | 0.65 |
-| hand medium close to pitch antenna | 0.7 | 0.75 |
-| hand very close to pitch antenna | 1.0 | 0.85 |
-| hand high and close to pitch antenna | 1.0 | 1.0 |
-
-Then press `Train` and `Run` in Wekinator. In Processing, press `W` until the HUD says:
-
-`Mode: WEKINATOR / receiving`
-
-## Arduino Sensor Input
-
-The project is prepared to use an Arduino with a `VL53L1X` Time-of-Flight distance sensor, but this path is not yet hardware-validated because the device is not available yet.
-
-The Arduino sends:
+Saved demo project:
 
 ```text
-A,pitch_mm,volume_mm,confidence
+wekinator_projects/thereminwekinator/theremin/theremin.wekproj
 ```
 
-For the current one-sensor prototype:
-
-```text
-A,320,-1,1.00
-```
-
-Steps:
-
-1. Upload `arduino/tof_single_sensor/tof_single_sensor.ino`.
-2. Close Arduino Serial Monitor so Processing can open the serial port.
-3. Run the Processing sketch.
-4. Press `O` to connect or retry Arduino serial.
-5. Press `C` until the HUD says `Input: arduino sensor`.
-6. Press `X` until the HUD says `fusion OSC: 10 inputs / 4 outputs`.
-
-If Arduino is not connected, the sketch does not try to open serial automatically. The Arduino input mode falls back to mouse control, so cycling inputs with `C` should remain safe.
-
-See:
-
-`arduino/README.md`
-
-## Data Logging and TensorFlow
-
-Press `L` to start or stop CSV logging.
-
-CSV logs are saved under:
-
-```text
-processing_wekinator_theremin/data_logs/
-```
-
-Use number keys to label the current recording:
-
-```text
-0 free, 1 low, 2 middle, 3 high, 4 stable, 5 expressive, 6 noisy, 7 left, 8 right, 9 hold
-```
-
-Train the starter TensorFlow model with:
+Fast bootstrap training, with Wekinator open and OSC GUI control enabled:
 
 ```bash
-python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
+python tools/train_wekinator_demo.py --delete-existing
+python tools/probe_wekinator_outputs.py
 ```
 
-Before training, check whether the recorded CSV files are ready:
+In Processing, press `X` until the HUD shows `expressive OSC: 6 inputs / 4 outputs`, then press `W` to use Wekinator output.
 
-```bash
-python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
+## Demo Flow
+
+1. Direct theremin: show fixed movement-to-sound mapping.
+2. Chromatic mode: show exact musical notes.
+3. `Ode to Joy`: show melody-oriented control.
+4. Melody game: hold target notes and increase score.
+5. Trajectory rehab: follow an arc, vertical reach, or diagonal reach and show DTW score/repetitions.
+6. Wekinator: compare direct control with learned expressive stabilization.
+
+This explains the AI scope clearly:
+
+```text
+Processing extracts features.
+Wekinator learns a supervised real-time mapping.
+Processing turns predictions into sound and visual feedback.
+TensorFlow is the offline/future path for evaluated models and deployable apps.
 ```
 
-Or use the combined validation/training script:
+## Rehabilitation-Style Trajectory Demo
 
-```bash
-python ml/train_csvs.py
-```
+Press `P` until trajectory rehab is active.
 
-The training script writes a model, feature metadata, and a JSON training report when TensorFlow dependencies are installed and the dataset is ready.
-
-See:
-
-`ml/README.md`
-
-For the full Wekinator and TensorFlow data protocol, see:
-
-`TRAINING_PROTOCOL.md`
-
-## Practice Mode
-
-Press `P` to enable a first gamified exercise.
-
-The sketch loads the first `melody_hold` exercise from:
+Available trajectory exercises are configured in:
 
 ```text
 config/exercises.json
 ```
 
-By default it switches to chromatic mode and asks the user to hit and hold target notes from `Ode to Joy`.
+Current examples:
 
-This is the first step toward configurable music/physiotherapy-style exercises.
+- Guided reach arc
+- Shoulder flexion reach
+- Diagonal cross-body reach
 
-## Demo Guide
-
-Press `B` to show or hide the on-screen demo guide.
-
-Press `N` to advance through:
+Controls:
 
 ```text
-direct theremin -> chromatic notes -> guided melody -> practice game -> Wekinator expression
+Z: switch trajectory exercise
+G: make DTW matching easier
+F: make DTW matching stricter
+R: reset the current attempt
+L: log CSV data
 ```
 
-This keeps the live presentation aligned with `DEMO_PLAN.md`.
+The system measures:
 
-## MacBook Pro Camera Notes
+```text
+DTW score, best score, repetitions, detected gesture, expected gesture, smoothness, path length, direction changes
+```
 
-The camera motion mode uses motion detection, not anatomical hand tracking. It works best when:
+This supports a demo where a participant must perform a controlled movement to reach a target. It should be presented as an educational/wellness prototype, not as clinical assessment.
 
-- The room has stable lighting.
-- Only one hand is moving.
-- The background is not moving.
-- You press `R` while still to recalibrate the background.
+## Python Rehab App
 
-On macOS, the first camera run may require permission:
+The Python companion app is a standalone foundation for hand-tracking and movement scoring:
 
-`System Settings > Privacy & Security > Camera > Processing`
+```text
+apps/python_rehab/
+```
 
-Enable Processing, then restart Processing.
-
-## Eye Motion Mode
-
-Eye mode is experimental. A MacBook Pro webcam cannot detect the retina. It can only estimate eye or pupil movement from the visible eye region in the camera image.
-
-To try it:
-
-1. Press `C` until the HUD says `Input: eye motion`.
-2. Sit close to the MacBook camera.
-3. Keep your face mostly still.
-4. Make sure your eyes are inside the yellow `eye region`.
-5. Look straight ahead and press `E` or `R` to calibrate the center.
-6. Look left, right, up, and down. The theremin hand should move in the same direction.
-7. Use `G` to increase gaze sensitivity, or `F` to decrease it.
-8. Use `Y` to increase vertical gaze gain, or `H` to decrease it.
-9. Use `A` and `D` if the dark-pixel count is too high or too low.
-
-In the eye region overlay:
-
-- The yellow cross is the calibrated center.
-- The blue dot is the current dark-pixel eye estimate.
-
-This works best with good frontal light and without strong reflections on glasses.
-
-For a stronger GitHub/class explanation, call it `experimental gaze-inspired control`, not medical eye tracking.
-
-## macOS Permission Troubleshooting
-
-### Camera permission
-
-If camera mode does not show video, check:
-
-`System Settings > Privacy & Security > Camera > Processing`
-
-Enable Processing, then fully quit and reopen Processing.
-
-### Documents or sketchbook permission
-
-If Processing cannot read sketches or libraries from `Documents`, check:
-
-`System Settings > Privacy & Security > Files and Folders`
-
-Allow Processing to access the Documents folder. If that option does not appear, try opening the sketch directly from Processing with:
-
-`File > Open...`
-
-### Local network / OSC permission
-
-If Wekinator and Processing do not communicate even though the ports are correct, macOS may ask for Local Network access. Check:
-
-`System Settings > Privacy & Security > Local Network`
-
-Enable Processing and Wekinator if they appear there. Then restart both apps.
-
-### Blocked library files
-
-If macOS blocks a downloaded Processing library, remove quarantine attributes from the installed library folder:
+Install:
 
 ```bash
-xattr -dr com.apple.quarantine ~/Documents/Processing/libraries/video
+python3 -m venv apps/python_rehab/.venv
+source apps/python_rehab/.venv/bin/activate
+pip install -r apps/python_rehab/requirements.txt
 ```
 
-For this machine, the same can be useful for the other libraries:
+Run:
 
 ```bash
-xattr -dr com.apple.quarantine ~/Documents/Processing/libraries/sound
-xattr -dr com.apple.quarantine ~/Documents/Processing/libraries/oscP5
+python apps/python_rehab/run_app.py
 ```
 
-### GitHub push permission
+It loads the shared `trajectory_match` exercises from `config/exercises.json`, tracks the index finger with MediaPipe, classifies simple movement gestures, and scores the movement path with Dynamic Time Warping.
 
-If `git push` fails with authentication errors, use one of these:
+## TensorFlow Training
 
-- HTTPS with browser/token authentication.
-- SSH with a GitHub SSH key.
-- GitHub CLI login with `gh auth login`.
+Record CSV data in Processing with `L`. Files are saved under:
 
-Common errors:
+```text
+apps/processing_wekinator/processing_wekinator_theremin/data_logs/
+```
 
-- `Permission denied (publickey)`: SSH key is missing or not linked to GitHub.
-- `Authentication failed`: HTTPS credentials/token need refresh.
-- `remote origin already exists`: the repo already has a remote configured; update it instead of adding it again.
+Check and train:
 
-## Course Connection
+```bash
+python ml/train_csvs.py
+```
 
-This project demonstrates a machine-learning digital music interface:
+The trainer uses required movement/sound columns and optional exercise columns such as:
 
-`gesture features -> Wekinator model -> musical control outputs -> sound/visual feedback`
+```text
+melody_step_speed, trajectory_score, trajectory_distance, trajectory_reps, trajectory_smoothness
+```
 
-The direct mode shows a programmed mapping. The Wekinator mode shows a learned mapping, allowing non-linear and more expressive behavior than a fixed `mouseX -> pitch` rule.
+Model outputs are generated locally under `ml/models/`, which is ignored by Git until a model is intentionally documented and released.
 
-For more possible AI training directions, see:
+## macOS App Launcher
 
-`AI_TRAINING_IDEAS.md`
+Create a local launcher app:
 
-For the more formal project framing and Arduino extension notes, see:
+```bash
+python tools/build_macos_launcher.py
+```
 
-`PROJECT_FORMALIZATION.md`
+Output:
 
-For the practical demo sequence, Wekinator training protocol, and macOS app export, see:
+```text
+dist/Adaptive Expressive Theremin Launcher.app
+```
 
-- `DEMO_PLAN.md`
-- `TRAINING_PROTOCOL.md`
-- `APP_EXPORT.md`
+For a full standalone Processing export, use Processing:
 
-Project tracking docs:
+```text
+File -> Export Application
+```
 
-- `PROCESS.md`
-- `DONE.md`
-- `NEXT_STEPS.md`
-- `FUTURE_WORK.md`
-- `DEMO_PLAN.md`
-- `TRAINING_PROTOCOL.md`
-- `APP_EXPORT.md`
-- `GIT_BRANCHING.md`
-- `WORKING_PROMPT.md`
+## Development Notes
 
-Trained Wekinator projects can be documented under:
-
-`wekinator_projects/`
+- Arduino support is intentionally not part of the current demo path.
+- Generated logs, app exports, model outputs, virtual environments, and local prototypes are ignored.
+- Wekinator project files under `wekinator_projects/` are part of the deliverable when intentionally saved.
+- Keep internal planning notes outside the public deliverable.

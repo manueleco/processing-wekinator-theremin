@@ -2,6 +2,18 @@
 
 This folder should hold the first trained expressive Wekinator project.
 
+The included scaffold lives in:
+
+```text
+AdaptiveExpressiveTheremin6x4/AdaptiveExpressiveTheremin6x4.wekproj
+```
+
+The saved bootstrap-trained project now lives in:
+
+```text
+../thereminwekinator/theremin/theremin.wekproj
+```
+
 ## Training Setup
 
 ```text
@@ -21,6 +33,16 @@ Output type: All continuous
 pitch proximity, volume distance, movement speed, acceleration, confidence, noise
 -> stabilized pitch, stabilized volume, vibrato, timbre brightness
 ```
+
+## Fast Bootstrap Option
+
+Open the scaffold in Wekinator, enable `Actions -> Enable OSC control of GUI`, then run:
+
+```bash
+python tools/train_wekinator_demo.py --delete-existing
+```
+
+This records synthetic examples and starts the trained model. It is useful for a classroom demo, but real user examples should still be recorded for the final explanation.
 
 ## Training Notes
 

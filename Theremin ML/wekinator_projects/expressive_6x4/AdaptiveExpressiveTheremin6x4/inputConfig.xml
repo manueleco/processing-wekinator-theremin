@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<OSCInputGroup>
+  <oscMessage>/wek/inputs</oscMessage>
+  <numInputs>6</numInputs>
+  <groupName>Inputs</groupName>
+  <inputNames>
+    <string>pitch_proximity</string>
+    <string>volume_distance</string>
+    <string>movement_speed</string>
+    <string>movement_acceleration</string>
+    <string>tracking_confidence</string>
+    <string>sensor_noise</string>
+  </inputNames>
+</OSCInputGroup>

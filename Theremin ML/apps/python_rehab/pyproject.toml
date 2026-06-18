@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adaptive-expressive-theremin-rehab"
+version = "0.1.0"
+description = "Python trajectory-scoring companion app for Adaptive Expressive Theremin."
+requires-python = ">=3.10"
+dependencies = [
+  "opencv-python>=4.9",
+  "mediapipe>=0.10.14",
+]
+
+[project.scripts]
+theremin-rehab = "theremin_rehab.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -17,9 +17,10 @@ import java.io.File;
 final int WEKINATOR_INPUT_PORT = 6448;
 final int PROCESSING_LISTEN_PORT = 12000;
 final int INPUT_MOUSE = 0;
-final int INPUT_MOTION = 1;
-final int INPUT_EYES = 2;
-final int INPUT_ARDUINO = 3;
+final int INPUT_KEYBOARD = 1;
+final int INPUT_MOTION = 2;
+final int INPUT_EYES = 3;
+final int INPUT_ARDUINO = 4;
 final int PITCH_CONTINUOUS = 0;
 final int PITCH_CHROMATIC = 1;
 final int PITCH_PENTATONIC = 2;
@@ -27,6 +28,9 @@ final int PITCH_ODE_TO_JOY = 3;
 final int WEKI_BASIC = 0;
 final int WEKI_EXPRESSIVE = 1;
 final int WEKI_FUSION = 2;
+final int PRACTICE_OFF = 0;
+final int PRACTICE_MELODY = 1;
+final int PRACTICE_TRAJECTORY = 2;
 
 Capture camera;
 Serial arduinoPort;
@@ -38,6 +42,9 @@ SawOsc timbreOsc;
 int[] previousPixels;
 boolean cameraAvailable = false;
 boolean cameraTried = false;
+boolean cameraStarting = false;
+int cameraStartMillis = -9999;
+String cameraStatus = "camera off";
 boolean mirrorCamera = true;
 int inputMode = INPUT_MOUSE;
 boolean arduinoAvailable = false;
@@ -91,6 +98,10 @@ float eyeRoiH = 0.22;
 
 float inputPitch = 0.5;
 float inputVolume = 0.0;
+float keyboardPitch = 0.5;
+float keyboardVolume = 0.65;
+int keyboardChromaticIndex = 18;
+int keyboardMelodyIndex = 0;
 float wekiPitch = 0.5;
 float wekiVolume = 0.0;
 float wekiVibrato = 0.0;
@@ -112,6 +123,9 @@ boolean useWekinator = false;
 int pitchMode = PITCH_CONTINUOUS;
 int currentMidiNote = -1;
 int currentMelodyIndex = -1;
+int previousMelodyIndexForSpeed = -1;
+int lastMelodyStepMillis = -9999;
+float melodyStepSpeed = 0;
 boolean sendToWekinator = true;
 int wekinatorProfile = WEKI_BASIC;
 boolean testTone = false;
@@ -122,6 +136,7 @@ String trainingLabel = "free";
 String dataLogFilename = "";
 int dataLogRows = 0;
 boolean practiceMode = false;
+int practiceType = PRACTICE_OFF;
 int practiceStep = 0;
 int practiceScore = 0;
 float practiceHoldSeconds = 0;
@@ -131,13 +146,47 @@ String activeExerciseName = "Ode to Joy Note Hold";
 String activeExerciseGoal = "Hit each note and hold it steadily.";
 boolean exerciseConfigLoaded = false;
 int[] practiceMelodyMidi;
+ArrayList<PVector> trajectoryTargetPath = new ArrayList<PVector>();
+ArrayList<PVector> trajectoryUserPath = new ArrayList<PVector>();
+ArrayList<ArrayList<PVector>> trajectoryExercisePaths = new ArrayList<ArrayList<PVector>>();
+ArrayList<String> trajectoryExerciseIds = new ArrayList<String>();
+ArrayList<String> trajectoryExerciseNames = new ArrayList<String>();
+ArrayList<String> trajectoryExerciseGoals = new ArrayList<String>();
+ArrayList<String> trajectoryExpectedGestures = new ArrayList<String>();
+ArrayList<Float> trajectoryExerciseTolerances = new ArrayList<Float>();
+ArrayList<Float> trajectoryExerciseRequiredScores = new ArrayList<Float>();
+ArrayList<Integer> trajectoryExerciseRepetitions = new ArrayList<Integer>();
+ArrayList<Integer> trajectoryExerciseSampleCounts = new ArrayList<Integer>();
+int trajectoryExerciseIndex = 0;
+String trajectoryExerciseId = "rehab_horizontal_arc";
+String trajectoryExerciseName = "Guided Reach Arc";
+String trajectoryExerciseGoal = "Follow the target path smoothly.";
+String trajectoryExpectedGesture = "arc";
+String trajectoryDetectedGesture = "collecting";
+float trajectoryScore = 0;
+float trajectoryBestScore = 0;
+float trajectoryDistance = 1;
+float trajectoryCompletion = 0;
+float trajectoryTolerance = 0.42;
+float trajectoryRequiredScore = 72;
+float trajectorySmoothness = 0;
+float trajectoryPathLength = 0;
+float trajectoryDirectness = 0;
+int trajectoryDirectionChanges = 0;
+int trajectoryReps = 0;
+int trajectoryTargetReps = 3;
+int trajectorySampleCount = 48;
+int trajectoryLastSampleMillis = -9999;
+int trajectoryLastRepMillis = -9999;
 boolean demoGuide = false;
 int demoStep = 0;
+boolean presentationWindow = false;
 
 float minFreq = 160.0;
 float maxFreq = 1400.0;
 float masterGain = 0.35;
-float pitchRange = 430.0;
+float pitchFieldStartRatio = 0.28;
+float pitchFieldStep = 0.035;
 float volumeRange = 390.0;
 int chromaticMinMidi = 48;
 int chromaticMaxMidi = 84;
@@ -157,6 +206,8 @@ int[] odeToJoyMidi = {
 
 void setup() {
   size(900, 560);
+  surface.setResizable(true);
+  surface.setTitle("Adaptive Expressive Theremin");
   smooth(8);
   colorMode(RGB, 255);
 
@@ -207,12 +258,15 @@ void draw() {
     targetBrightness = 0.18;
   }
 
-  smoothPitch = lerp(smoothPitch, targetPitch, 0.12);
-  smoothVolume = lerp(smoothVolume, muted ? 0 : targetVolume, 0.10);
+  float pitchSmoothing = inputMode == INPUT_KEYBOARD ? 0.48 : 0.12;
+  float volumeSmoothing = inputMode == INPUT_KEYBOARD ? 0.30 : 0.10;
+  smoothPitch = lerp(smoothPitch, targetPitch, pitchSmoothing);
+  smoothVolume = lerp(smoothVolume, muted ? 0 : targetVolume, volumeSmoothing);
   smoothVibrato = lerp(smoothVibrato, muted ? 0 : targetVibrato, 0.10);
   smoothBrightness = lerp(smoothBrightness, muted ? 0 : targetBrightness, 0.10);
 
   float baseFreq = pitchToFrequency(smoothPitch);
+  updateMelodyStepSpeed();
   float vibratoRate = map(smoothVibrato, 0, 1, 4.0, 8.5);
   float vibratoDepthSemitones = map(smoothVibrato, 0, 1, 0.0, 0.85);
   float vibratoSemitones = sin(frameCount * 0.08 * vibratoRate) * vibratoDepthSemitones;
@@ -248,6 +302,8 @@ void updateHandInput() {
     updateEyeHand();
   } else if (inputMode == INPUT_ARDUINO) {
     updateArduinoHand();
+  } else if (inputMode == INPUT_KEYBOARD) {
+    updateKeyboardHand();
   } else {
     updateMouseHand();
   }
@@ -264,21 +320,46 @@ void updateMouseHand() {
   handY = lerp(handY, rawHandY, 0.25);
 }
 
+void updateKeyboardHand() {
+  rawHandX = map(keyboardPitch, 0, 1, pitchFieldStartX(), pitchAntennaX());
+  rawHandY = map(keyboardVolume, 0, 1, height - 90, 92);
+  handConfidence = 1;
+  motionPixels = 0;
+  eyeDarkPixels = 0;
+  eyeCalibrated = false;
+  handX = lerp(handX, rawHandX, 0.48);
+  handY = lerp(handY, rawHandY, 0.48);
+}
+
 void startCameraIfNeeded() {
-  if (cameraAvailable || cameraTried) {
+  if (cameraAvailable || cameraStarting || cameraTried) {
     return;
   }
 
   cameraTried = true;
+  cameraStarting = true;
+  cameraStatus = "camera starting";
+  cameraStartMillis = millis();
+
   try {
     String[] cameras = Capture.list();
-    if (cameras.length > 0) {
+    if (cameras != null && cameras.length > 0) {
       camera = new Capture(this, 640, 480);
       camera.start();
       cameraAvailable = true;
+      cameraStatus = "camera on";
+      println("Camera started.");
+    } else {
+      cameraAvailable = false;
+      cameraStatus = "camera not found";
+      println("Camera not found.");
     }
   } catch (Exception e) {
+    cameraAvailable = false;
+    cameraStatus = "camera failed";
     println("Camera could not be started: " + e.getMessage());
+  } finally {
+    cameraStarting = false;
   }
 }
 
@@ -420,8 +501,6 @@ void updateArduinoHand() {
 }
 
 void updateMotionHand() {
-  startCameraIfNeeded();
-
   if (!cameraAvailable || camera == null || camera.width == 0 || camera.height == 0) {
     updateMouseHand();
     return;
@@ -476,8 +555,6 @@ void updateMotionHand() {
 }
 
 void updateEyeHand() {
-  startCameraIfNeeded();
-
   if (!cameraAvailable || camera == null || camera.width == 0 || camera.height == 0) {
     updateMouseHand();
     return;
@@ -596,9 +673,12 @@ void updateInputs() {
   if (inputMode == INPUT_ARDUINO && arduinoIsLive()) {
     inputPitch = arduinoPitchControl;
     inputVolume = arduinoVolumeControl;
+  } else if (inputMode == INPUT_KEYBOARD) {
+    inputPitch = keyboardPitch;
+    inputVolume = keyboardVolume;
   } else {
     float pitchDistance = max(0, pitchAntennaX() - handX);
-    inputPitch = constrain(1.0 - pitchDistance / pitchRange, 0, 1);
+    inputPitch = constrain(1.0 - pitchDistance / pitchFieldRange(), 0, 1);
 
     float loopDistance = dist(handX, handY, volumeLoopX(), volumeLoopY());
     inputVolume = constrain((loopDistance - 35.0) / volumeRange, 0, 1);
@@ -685,6 +765,31 @@ float pitchToFrequency(float value) {
   return minFreq * pow(maxFreq / minFreq, value);
 }
 
+void updateMelodyStepSpeed() {
+  if (pitchMode != PITCH_ODE_TO_JOY || currentMelodyIndex < 0) {
+    melodyStepSpeed = lerp(melodyStepSpeed, 0, 0.05);
+    previousMelodyIndexForSpeed = -1;
+    return;
+  }
+
+  if (previousMelodyIndexForSpeed < 0) {
+    previousMelodyIndexForSpeed = currentMelodyIndex;
+    lastMelodyStepMillis = millis();
+    return;
+  }
+
+  if (currentMelodyIndex != previousMelodyIndexForSpeed) {
+    int now = millis();
+    float seconds = max(0.05, (now - lastMelodyStepMillis) / 1000.0);
+    float steps = abs(currentMelodyIndex - previousMelodyIndexForSpeed);
+    melodyStepSpeed = lerp(melodyStepSpeed, steps / seconds, 0.55);
+    previousMelodyIndexForSpeed = currentMelodyIndex;
+    lastMelodyStepMillis = now;
+  } else {
+    melodyStepSpeed = lerp(melodyStepSpeed, 0, 0.018);
+  }
+}
+
 float midiToFrequency(int midiNote) {
   return 440.0 * pow(2.0, (midiNote - 69) / 12.0);
 }
@@ -721,12 +826,17 @@ String midiNoteName(int midiNote) {
 }
 
 void keyPressed() {
+  if (key == CODED && handleTrainerArrowKey()) {
+    return;
+  }
+
   if (key == 'm' || key == 'M') {
     muted = !muted;
   } else if (key == 'w' || key == 'W') {
     useWekinator = !useWekinator;
   } else if (key == 'q' || key == 'Q') {
     pitchMode = (pitchMode + 1) % 4;
+    syncKeyboardTrainerToPitchMode();
   } else if (key == 's' || key == 'S') {
     sendToWekinator = !sendToWekinator;
   } else if (key == 'x' || key == 'X') {
@@ -742,34 +852,49 @@ void keyPressed() {
     demoGuide = true;
     demoStep = (demoStep + 1) % demoStepCount();
   } else if (key == 'p' || key == 'P') {
-    practiceMode = !practiceMode;
-    if (practiceMode) {
-      pitchMode = PITCH_CHROMATIC;
-      practiceHoldSeconds = 0;
-    }
+    cyclePracticeMode();
+  } else if (key == 'z' || key == 'Z') {
+    cycleTrajectoryExercise();
   } else if (key == 't' || key == 'T') {
     testTone = !testTone;
   } else if (key == 'c' || key == 'C') {
-    inputMode = (inputMode + 1) % 4;
-    if (inputMode == INPUT_MOTION || inputMode == INPUT_EYES) {
-      startCameraIfNeeded();
-      resetMotionReference();
-    }
+    cycleInputMode();
+  } else if (key == 'k' || key == 'K') {
+    retryCamera();
+    resetMotionReference();
+  } else if (key == 'u' || key == 'U') {
+    togglePresentationWindow();
+  } else if (key == 'i' || key == 'I') {
+    adjustPitchFieldStart(-1);
+  } else if (key == 'j' || key == 'J') {
+    adjustPitchFieldStart(1);
   } else if (key == 'e' || key == 'E') {
     if (inputMode == INPUT_EYES) {
       requestEyeCalibration = true;
     }
   } else if (key == 'r' || key == 'R') {
-    resetMotionReference();
+    if (practiceType == PRACTICE_TRAJECTORY) {
+      resetTrajectoryPractice(false);
+    } else {
+      resetMotionReference();
+    }
   } else if (key == 'v' || key == 'V') {
     mirrorCamera = !mirrorCamera;
     if (inputMode == INPUT_EYES) {
       requestEyeCalibration = true;
     }
   } else if (key == 'g' || key == 'G') {
-    adjustSensorSensitivity(1);
+    if (practiceType == PRACTICE_TRAJECTORY) {
+      adjustTrajectoryCalibration(1);
+    } else {
+      adjustSensorSensitivity(1);
+    }
   } else if (key == 'f' || key == 'F') {
-    adjustSensorSensitivity(-1);
+    if (practiceType == PRACTICE_TRAJECTORY) {
+      adjustTrajectoryCalibration(-1);
+    } else {
+      adjustSensorSensitivity(-1);
+    }
   } else if (key == 'y' || key == 'Y') {
     if (inputMode == INPUT_EYES) {
       eyeSensitivityY = min(16.0, eyeSensitivityY + 0.8);
@@ -791,12 +916,135 @@ void keyPressed() {
   }
 }
 
+boolean handleTrainerArrowKey() {
+  if (keyCode != LEFT && keyCode != RIGHT && keyCode != UP && keyCode != DOWN) {
+    return false;
+  }
+
+  if (inputMode != INPUT_KEYBOARD) {
+    inputMode = INPUT_KEYBOARD;
+    syncKeyboardTrainerToPitchMode();
+  }
+
+  if (keyCode == LEFT) {
+    adjustKeyboardPitch(-1);
+  } else if (keyCode == RIGHT) {
+    adjustKeyboardPitch(1);
+  } else if (keyCode == UP) {
+    adjustKeyboardVolume(1);
+  } else if (keyCode == DOWN) {
+    adjustKeyboardVolume(-1);
+  }
+
+  resetMotionReference();
+  return true;
+}
+
+void cycleInputMode() {
+  if (inputMode == INPUT_MOUSE) {
+    inputMode = INPUT_KEYBOARD;
+  } else if (inputMode == INPUT_KEYBOARD) {
+    inputMode = INPUT_MOTION;
+  } else if (inputMode == INPUT_MOTION) {
+    inputMode = INPUT_EYES;
+    requestEyeCalibration = true;
+  } else {
+    inputMode = INPUT_MOUSE;
+  }
+  resetMotionReference();
+}
+
+void syncKeyboardTrainerToPitchMode() {
+  if (pitchMode == PITCH_CHROMATIC) {
+    keyboardChromaticIndex = constrain(round(keyboardPitch * chromaticStepCount()), 0, chromaticStepCount());
+    keyboardPitch = keyboardChromaticIndex / float(max(1, chromaticStepCount()));
+  } else if (pitchMode == PITCH_ODE_TO_JOY) {
+    keyboardMelodyIndex = constrain(round(keyboardPitch * (odeToJoyMidi.length - 1)), 0, odeToJoyMidi.length - 1);
+    keyboardPitch = keyboardMelodyIndex / float(max(1, odeToJoyMidi.length - 1));
+  }
+}
+
+void adjustKeyboardPitch(int direction) {
+  if (pitchMode == PITCH_CHROMATIC) {
+    keyboardChromaticIndex = constrain(keyboardChromaticIndex + direction, 0, chromaticStepCount());
+    keyboardPitch = keyboardChromaticIndex / float(max(1, chromaticStepCount()));
+  } else if (pitchMode == PITCH_ODE_TO_JOY) {
+    keyboardMelodyIndex = constrain(keyboardMelodyIndex + direction, 0, odeToJoyMidi.length - 1);
+    keyboardPitch = keyboardMelodyIndex / float(max(1, odeToJoyMidi.length - 1));
+  } else if (pitchMode == PITCH_PENTATONIC) {
+    int index = constrain(round(keyboardPitch * (pentatonicMidi.length - 1)) + direction, 0, pentatonicMidi.length - 1);
+    keyboardPitch = index / float(max(1, pentatonicMidi.length - 1));
+  } else {
+    keyboardPitch = constrain(keyboardPitch + direction * 0.035, 0, 1);
+  }
+}
+
+void adjustKeyboardVolume(int direction) {
+  keyboardVolume = constrain(keyboardVolume + direction * 0.06, 0, 1);
+}
+
+int chromaticStepCount() {
+  return chromaticMaxMidi - chromaticMinMidi;
+}
+
+void retryCamera() {
+  try {
+    if (camera != null) {
+      camera.stop();
+      camera = null;
+    }
+  } catch (Exception e) {
+    println("Camera close failed: " + e.getMessage());
+  }
+
+  cameraAvailable = false;
+  cameraStarting = false;
+  cameraTried = false;
+  cameraStatus = "camera off";
+  previousPixels = null;
+  startCameraIfNeeded();
+}
+
+void togglePresentationWindow() {
+  presentationWindow = !presentationWindow;
+  if (presentationWindow) {
+    surface.setLocation(0, 0);
+    surface.setSize(displayWidth, max(560, displayHeight - 80));
+  } else {
+    surface.setSize(900, 560);
+    surface.setLocation(max(0, (displayWidth - 900) / 2), max(0, (displayHeight - 560) / 2));
+  }
+}
+
+void adjustPitchFieldStart(float direction) {
+  pitchFieldStartRatio = constrain(pitchFieldStartRatio + direction * pitchFieldStep, 0.12, 0.48);
+  resetMotionReference();
+}
+
 void adjustSensorSensitivity(float direction) {
   if (inputMode == INPUT_EYES) {
     eyeSensitivityX = constrain(eyeSensitivityX + direction * 0.4, 1.2, 12.0);
     eyeSensitivityY = constrain(eyeSensitivityY + direction * 0.8, 1.6, 16.0);
   } else if (inputMode == INPUT_MOTION) {
     motionThreshold = constrain(motionThreshold - direction * 4, 8, 95);
+  }
+}
+
+void adjustTrajectoryCalibration(float direction) {
+  trajectoryTolerance = constrain(trajectoryTolerance + direction * 0.025, 0.22, 0.70);
+  trajectoryRequiredScore = constrain(trajectoryRequiredScore - direction * 2.0, 55, 90);
+}
+
+void cycleTrajectoryExercise() {
+  if (trajectoryExercisePaths.size() == 0) {
+    loadDefaultTrajectoryExercises();
+  }
+  trajectoryExerciseIndex = (trajectoryExerciseIndex + 1) % max(1, trajectoryExercisePaths.size());
+  setTrajectoryExercise(trajectoryExerciseIndex);
+  if (practiceType != PRACTICE_TRAJECTORY) {
+    startPracticeMode(PRACTICE_TRAJECTORY);
+  } else {
+    resetTrajectoryPractice(false);
   }
 }
 
@@ -840,10 +1088,11 @@ void toggleDataLogging() {
 }
 
 String dataLogHeader() {
-  return "millis,input_mode,wekinator_profile,label,input_pitch,input_volume,movement_speed,movement_acceleration,hand_confidence,sensor_noise,"
+  return "millis,input_mode,wekinator_profile,label,input_pitch,input_volume,keyboard_pitch,keyboard_volume,melody_step_speed,movement_speed,movement_acceleration,hand_confidence,sensor_noise,"
     + "arduino_pitch_mm,arduino_volume_mm,arduino_pitch_control,arduino_volume_control,arduino_speed,arduino_confidence,arduino_noise,"
     + "weki_pitch,weki_volume,weki_vibrato,weki_brightness,target_pitch,target_volume,target_vibrato,target_brightness,"
-    + "practice_mode,practice_step,practice_score,practice_target_midi,exercise_id,current_midi_note,freq,amp";
+    + "practice_mode,practice_type,practice_step,practice_score,practice_target_midi,exercise_id,trajectory_score,trajectory_best_score,trajectory_distance,trajectory_tolerance,"
+    + "trajectory_reps,trajectory_gesture,trajectory_expected_gesture,trajectory_smoothness,trajectory_path_length,trajectory_direction_changes,current_midi_note,freq,amp";
 }
 
 void logDataFrame(float freq, float amp) {
@@ -857,6 +1106,9 @@ void logDataFrame(float freq, float amp) {
     + trainingLabel + ","
     + nf(inputPitch, 1, 4) + ","
     + nf(inputVolume, 1, 4) + ","
+    + nf(keyboardPitch, 1, 4) + ","
+    + nf(keyboardVolume, 1, 4) + ","
+    + nf(melodyStepSpeed, 1, 4) + ","
     + nf(movementSpeed, 1, 4) + ","
     + nf(movementAcceleration, 1, 4) + ","
     + nf(handConfidence, 1, 4) + ","
@@ -877,10 +1129,21 @@ void logDataFrame(float freq, float amp) {
     + nf(targetVibrato, 1, 4) + ","
     + nf(targetBrightness, 1, 4) + ","
     + practiceMode + ","
+    + practiceTypeLabelForData() + ","
     + practiceStep + ","
     + practiceScore + ","
     + practiceTargetMidi() + ","
-    + csvSafe(activeExerciseId) + ","
+    + csvSafe(currentExerciseIdForData()) + ","
+    + nf(trajectoryScore, 1, 2) + ","
+    + nf(trajectoryBestScore, 1, 2) + ","
+    + nf(trajectoryDistance, 1, 4) + ","
+    + nf(trajectoryTolerance, 1, 4) + ","
+    + trajectoryReps + ","
+    + csvSafe(trajectoryDetectedGesture) + ","
+    + csvSafe(trajectoryExpectedGesture) + ","
+    + nf(trajectorySmoothness, 1, 4) + ","
+    + nf(trajectoryPathLength, 1, 4) + ","
+    + trajectoryDirectionChanges + ","
     + currentMidiNote + ","
     + nf(freq, 1, 2) + ","
     + nf(amp, 1, 4));
@@ -896,6 +1159,9 @@ String csvSafe(String value) {
 }
 
 String inputModeLabelForData() {
+  if (inputMode == INPUT_KEYBOARD) {
+    return "keyboard";
+  }
   if (inputMode == INPUT_MOTION) {
     return "motion";
   }
@@ -916,6 +1182,26 @@ String wekinatorProfileLabelForData() {
     return "expressive";
   }
   return "basic";
+}
+
+String practiceTypeLabelForData() {
+  if (practiceType == PRACTICE_MELODY) {
+    return "melody_hold";
+  }
+  if (practiceType == PRACTICE_TRAJECTORY) {
+    return "trajectory_match";
+  }
+  return "off";
+}
+
+String currentExerciseIdForData() {
+  if (practiceType == PRACTICE_TRAJECTORY) {
+    return trajectoryExerciseId;
+  }
+  if (practiceType == PRACTICE_MELODY) {
+    return activeExerciseId;
+  }
+  return "";
 }
 
 void setTrainingLabel(char numberKey) {
@@ -942,11 +1228,46 @@ void setTrainingLabel(char numberKey) {
   }
 }
 
+void cyclePracticeMode() {
+  if (practiceType == PRACTICE_OFF) {
+    startPracticeMode(PRACTICE_MELODY);
+  } else if (practiceType == PRACTICE_MELODY) {
+    startPracticeMode(PRACTICE_TRAJECTORY);
+  } else {
+    startPracticeMode(PRACTICE_OFF);
+  }
+}
+
+void startPracticeMode(int nextType) {
+  practiceType = nextType;
+  practiceMode = practiceType != PRACTICE_OFF;
+
+  if (practiceType == PRACTICE_MELODY) {
+    pitchMode = PITCH_CHROMATIC;
+    syncKeyboardTrainerToPitchMode();
+    practiceHoldSeconds = 0;
+  } else if (practiceType == PRACTICE_TRAJECTORY) {
+    resetTrajectoryPractice(false);
+  } else {
+    practiceHoldSeconds = 0;
+    trajectoryUserPath.clear();
+  }
+}
+
 void updatePracticeMode() {
-  if (!practiceMode) {
+  if (practiceType == PRACTICE_OFF) {
     return;
   }
 
+  if (practiceType == PRACTICE_TRAJECTORY) {
+    updateTrajectoryPractice();
+    return;
+  }
+
+  updateMelodyPractice();
+}
+
+void updateMelodyPractice() {
   int targetNote = practiceTargetMidi();
   boolean noteMatches = currentMidiNote == targetNote && smoothVolume > 0.08;
 
@@ -961,6 +1282,233 @@ void updatePracticeMode() {
     practiceStep = (practiceStep + 1) % odeToJoyMidi.length;
     practiceHoldSeconds = 0;
   }
+}
+
+void updateTrajectoryPractice() {
+  if (trajectoryTargetPath.size() == 0) {
+    loadDefaultTrajectoryExercises();
+  }
+
+  int now = millis();
+  if (now - trajectoryLastSampleMillis > 70 && handConfidence > 0.08) {
+    trajectoryUserPath.add(normalizedHandPoint());
+    trajectoryLastSampleMillis = now;
+  }
+
+  while (trajectoryUserPath.size() > max(trajectorySampleCount, 8)) {
+    trajectoryUserPath.remove(0);
+  }
+
+  trajectoryCompletion = constrain(trajectoryUserPath.size() / float(max(1, trajectorySampleCount)), 0, 1);
+  updateTrajectoryGestureMetrics();
+
+  if (trajectoryUserPath.size() >= 6) {
+    trajectoryDistance = dtwDistance(
+      resamplePath(trajectoryUserPath, trajectorySampleCount),
+      resamplePath(trajectoryTargetPath, trajectorySampleCount)
+    );
+    trajectoryScore = constrain(100.0f * (1.0f - trajectoryDistance / max(0.05f, trajectoryTolerance)), 0, 100);
+    trajectoryBestScore = max(trajectoryBestScore, trajectoryScore);
+  } else {
+    trajectoryScore = lerp(trajectoryScore, 0, 0.08);
+  }
+
+  boolean strongMatch = trajectoryCompletion > 0.72 && trajectoryScore >= trajectoryRequiredScore;
+  if (strongMatch && now - trajectoryLastRepMillis > 900) {
+    trajectoryReps++;
+    practiceScore++;
+    trajectoryLastRepMillis = now;
+    resetTrajectoryPractice(true);
+  }
+}
+
+PVector normalizedHandPoint() {
+  return new PVector(constrain(handX / max(1.0f, float(width)), 0, 1), constrain(handY / max(1.0f, float(height)), 0, 1));
+}
+
+void resetTrajectoryPractice(boolean keepBest) {
+  trajectoryUserPath.clear();
+  trajectoryCompletion = 0;
+  trajectoryDistance = 1;
+  trajectoryScore = 0;
+  trajectoryDetectedGesture = "collecting";
+  trajectorySmoothness = 0;
+  trajectoryPathLength = 0;
+  trajectoryDirectness = 0;
+  trajectoryDirectionChanges = 0;
+  if (!keepBest) {
+    trajectoryBestScore = 0;
+    trajectoryReps = 0;
+  }
+  trajectoryLastSampleMillis = -9999;
+}
+
+void updateTrajectoryGestureMetrics() {
+  int count = trajectoryUserPath.size();
+  if (count < 3) {
+    trajectoryDetectedGesture = "collecting";
+    trajectorySmoothness = 0;
+    trajectoryPathLength = 0;
+    trajectoryDirectness = 0;
+    trajectoryDirectionChanges = 0;
+    return;
+  }
+
+  PVector start = trajectoryUserPath.get(0);
+  PVector end = trajectoryUserPath.get(count - 1);
+  float minX = start.x;
+  float maxX = start.x;
+  float minY = start.y;
+  float maxY = start.y;
+  float totalDistance = 0;
+  float previousAngle = 0;
+  boolean hasPreviousAngle = false;
+  int changes = 0;
+
+  for (int i = 1; i < count; i++) {
+    PVector previous = trajectoryUserPath.get(i - 1);
+    PVector current = trajectoryUserPath.get(i);
+    float dx = current.x - previous.x;
+    float dy = current.y - previous.y;
+    float segment = sqrt(dx * dx + dy * dy);
+    totalDistance += segment;
+    minX = min(minX, current.x);
+    maxX = max(maxX, current.x);
+    minY = min(minY, current.y);
+    maxY = max(maxY, current.y);
+
+    if (segment > 0.015) {
+      float angle = atan2(dy, dx);
+      if (hasPreviousAngle && abs(angleDifference(angle, previousAngle)) > 0.95) {
+        changes++;
+      }
+      previousAngle = angle;
+      hasPreviousAngle = true;
+    }
+  }
+
+  float dx = end.x - start.x;
+  float dy = end.y - start.y;
+  float directDistance = sqrt(dx * dx + dy * dy);
+  float widthBox = maxX - minX;
+  float heightBox = maxY - minY;
+
+  trajectoryPathLength = totalDistance;
+  trajectoryDirectness = totalDistance > 0.0001 ? constrain(directDistance / totalDistance, 0, 1) : 0;
+  trajectoryDirectionChanges = changes;
+  trajectorySmoothness = constrain(trajectoryDirectness * 0.72f + (1.0f - min(1.0f, changes / 5.0f)) * 0.28f, 0, 1);
+  trajectoryDetectedGesture = classifyTrajectoryGesture(dx, dy, widthBox, heightBox, totalDistance, directDistance, changes);
+}
+
+float angleDifference(float a, float b) {
+  float diff = a - b;
+  while (diff > PI) {
+    diff -= TWO_PI;
+  }
+  while (diff < -PI) {
+    diff += TWO_PI;
+  }
+  return diff;
+}
+
+String classifyTrajectoryGesture(float dx, float dy, float widthBox, float heightBox, float totalDistance, float directDistance, int changes) {
+  if (totalDistance < 0.08) {
+    return "hold";
+  }
+  if (changes >= 5 && totalDistance > 0.28) {
+    return "unstable";
+  }
+  if (totalDistance > 0.45 && directDistance < 0.22 && widthBox > 0.16 && heightBox > 0.12) {
+    return "loop";
+  }
+  if (abs(dx) > 0.18 && abs(dy) > 0.14) {
+    if (dx > 0 && dy < 0) {
+      return "diagonal_up_right";
+    }
+    if (dx < 0 && dy < 0) {
+      return "diagonal_up_left";
+    }
+    if (dx > 0) {
+      return "diagonal_down_right";
+    }
+    return "diagonal_down_left";
+  }
+  if (abs(dx) > abs(dy) * 1.35 && abs(dx) > 0.18) {
+    return dx > 0 ? "reach_right" : "reach_left";
+  }
+  if (abs(dy) > abs(dx) * 1.35 && abs(dy) > 0.16) {
+    return dy < 0 ? "reach_up" : "reach_down";
+  }
+  if (widthBox > 0.25 && heightBox > 0.10) {
+    return "arc";
+  }
+  return "controlled_reach";
+}
+
+ArrayList<PVector> resamplePath(ArrayList<PVector> source, int count) {
+  ArrayList<PVector> result = new ArrayList<PVector>();
+  if (source == null || source.size() == 0 || count <= 0) {
+    return result;
+  }
+  if (source.size() == 1) {
+    for (int i = 0; i < count; i++) {
+      result.add(source.get(0).copy());
+    }
+    return result;
+  }
+
+  float[] cumulative = new float[source.size()];
+  cumulative[0] = 0;
+  for (int i = 1; i < source.size(); i++) {
+    cumulative[i] = cumulative[i - 1] + PVector.dist(source.get(i - 1), source.get(i));
+  }
+
+  float total = cumulative[source.size() - 1];
+  if (total <= 0.0001) {
+    for (int i = 0; i < count; i++) {
+      result.add(source.get(0).copy());
+    }
+    return result;
+  }
+
+  int segment = 1;
+  for (int i = 0; i < count; i++) {
+    float target = map(i, 0, max(1, count - 1), 0, total);
+    while (segment < cumulative.length - 1 && cumulative[segment] < target) {
+      segment++;
+    }
+    float previousDistance = cumulative[segment - 1];
+    float segmentLength = max(0.0001, cumulative[segment] - previousDistance);
+    float t = constrain((target - previousDistance) / segmentLength, 0, 1);
+    result.add(PVector.lerp(source.get(segment - 1), source.get(segment), t));
+  }
+  return result;
+}
+
+float dtwDistance(ArrayList<PVector> a, ArrayList<PVector> b) {
+  if (a == null || b == null || a.size() == 0 || b.size() == 0) {
+    return 1;
+  }
+
+  int n = a.size();
+  int m = b.size();
+  float[][] dtw = new float[n + 1][m + 1];
+  for (int i = 0; i <= n; i++) {
+    for (int j = 0; j <= m; j++) {
+      dtw[i][j] = 999999;
+    }
+  }
+  dtw[0][0] = 0;
+
+  for (int i = 1; i <= n; i++) {
+    for (int j = 1; j <= m; j++) {
+      float cost = PVector.dist(a.get(i - 1), b.get(j - 1));
+      float bestPrevious = min(dtw[i - 1][j], min(dtw[i][j - 1], dtw[i - 1][j - 1]));
+      dtw[i][j] = cost + bestPrevious;
+    }
+  }
+
+  return dtw[n][m] / max(1.0f, float(n + m));
 }
 
 int practiceTargetMidi() {
@@ -978,9 +1526,6 @@ int practiceLength() {
 }
 
 void resetMotionReference() {
-  if (inputMode == INPUT_MOTION || inputMode == INPUT_EYES) {
-    startCameraIfNeeded();
-  }
   if (inputMode == INPUT_EYES) {
     requestEyeCalibration = true;
   }
@@ -994,7 +1539,9 @@ void resetMotionReference() {
 
 void drawTheremin(float freq, float amp, boolean wekinatorIsLive) {
   drawInputBackground();
+  drawTopBar(wekinatorIsLive);
   drawFields();
+  drawTrajectoryGuide();
   drawThereminBody();
   drawWave(freq, amp);
   drawControlPoint();
@@ -1003,6 +1550,88 @@ void drawTheremin(float freq, float amp, boolean wekinatorIsLive) {
   drawHud(freq, amp, wekinatorIsLive);
   drawPracticeOverlay();
   drawDemoOverlay();
+}
+
+void drawTopBar(boolean wekinatorIsLive) {
+  noStroke();
+  fill(11, 15, 22, 238);
+  rect(0, 0, width, 64);
+  stroke(255, 255, 255, 28);
+  strokeWeight(1);
+  line(0, 64, width, 64);
+
+  fill(255);
+  textAlign(LEFT, CENTER);
+  textSize(18);
+  text("Adaptive Expressive Theremin", 24, 31);
+
+  float chipX = min(width * 0.46, 430);
+  chipX = drawStatusChip(chipX, 16, muted ? "Sound muted" : "Sound on", muted ? color(130) : color(112, 232, 163));
+  chipX = drawStatusChip(chipX, 16, pitchModeLabel(), color(88, 205, 255));
+  chipX = drawStatusChip(chipX, 16, inputModeLabel(), color(255, 194, 80));
+  chipX = drawStatusChip(chipX, 16, useWekinator && wekinatorIsLive ? "ML live" : "Direct", useWekinator && wekinatorIsLive ? color(112, 232, 163) : color(185));
+  drawStatusChip(chipX, 16, practiceTypeLabel(), practiceType == PRACTICE_OFF ? color(160) : color(255, 194, 80));
+}
+
+float drawStatusChip(float x, float y, String label, int accent) {
+  textSize(12);
+  float w = textWidth(label) + 26;
+  noStroke();
+  fill(255, 255, 255, 24);
+  rect(x, y, w, 30, 6);
+  fill(accent);
+  ellipse(x + 12, y + 15, 7, 7);
+  fill(235);
+  textAlign(LEFT, CENTER);
+  text(label, x + 22, y + 15);
+  return x + w + 8;
+}
+
+String practiceTypeLabel() {
+  if (practiceType == PRACTICE_MELODY) {
+    return "Melody game";
+  }
+  if (practiceType == PRACTICE_TRAJECTORY) {
+    return "Trajectory rehab";
+  }
+  return "Practice off";
+}
+
+void drawTrajectoryGuide() {
+  if (practiceType != PRACTICE_TRAJECTORY || trajectoryTargetPath.size() == 0) {
+    return;
+  }
+
+  noFill();
+  stroke(255, 194, 80, 220);
+  strokeWeight(4);
+  beginShape();
+  for (int i = 0; i < trajectoryTargetPath.size(); i++) {
+    PVector point = trajectoryTargetPath.get(i);
+    vertex(point.x * width, point.y * height);
+  }
+  endShape();
+
+  for (int i = 0; i < trajectoryTargetPath.size(); i++) {
+    PVector point = trajectoryTargetPath.get(i);
+    float x = point.x * width;
+    float y = point.y * height;
+    noStroke();
+    fill(i == 0 ? color(112, 232, 163) : color(255, 194, 80));
+    ellipse(x, y, i == 0 ? 14 : 10, i == 0 ? 14 : 10);
+  }
+
+  if (trajectoryUserPath.size() > 1) {
+    noFill();
+    stroke(88, 205, 255, 220);
+    strokeWeight(3);
+    beginShape();
+    for (int i = 0; i < trajectoryUserPath.size(); i++) {
+      PVector point = trajectoryUserPath.get(i);
+      vertex(point.x * width, point.y * height);
+    }
+    endShape();
+  }
 }
 
 void drawInputBackground() {
@@ -1074,6 +1703,14 @@ float pitchAntennaX() {
   return width - 96;
 }
 
+float pitchFieldStartX() {
+  return constrain(width * pitchFieldStartRatio, 40, pitchAntennaX() - 150);
+}
+
+float pitchFieldRange() {
+  return max(150, pitchAntennaX() - pitchFieldStartX());
+}
+
 float pitchAntennaTop() {
   return 112;
 }
@@ -1108,6 +1745,20 @@ void drawFields() {
     strokeWeight(1.5);
     ellipse(volumeLoopX(), volumeLoopY(), d, d * 0.64);
   }
+
+  drawPitchFieldGuide();
+}
+
+void drawPitchFieldGuide() {
+  float y = pitchAntennaTop() + 20;
+  float startX = pitchFieldStartX();
+  float endX = pitchAntennaX();
+
+  stroke(88, 205, 255, 78);
+  strokeWeight(2);
+  line(startX, y, endX, y);
+  line(startX, y - 8, startX, y + 8);
+  line(endX, y - 8, endX, y + 8);
 }
 
 void drawThereminBody() {
@@ -1224,16 +1875,6 @@ void drawVolumeMeter(float amp) {
 }
 
 void drawHud(float freq, float amp, boolean wekinatorIsLive) {
-  fill(240);
-  textAlign(LEFT, TOP);
-  textSize(22);
-  text("Processing + Wekinator Theremin", 24, 22);
-
-  textSize(14);
-  fill(190);
-  text("Input OSC: /wek/inputs -> localhost:6448", 24, 58);
-  text("Output OSC: /wek/outputs -> Processing port 12000", 24, 78);
-
   String mode = useWekinator ? "WEKINATOR" : "DIRECT PREVIEW";
   String live = wekinatorIsLive ? "receiving" : "waiting";
   String muteText = muted ? "muted" : "sound on";
@@ -1248,7 +1889,7 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
   } else if (inputMode == INPUT_ARDUINO && !arduinoIsLive()) {
     inputText += ", mouse fallback";
   }
-  String cameraText = cameraAvailable ? "camera on" : "camera off";
+  String cameraText = cameraStatusText();
   String arduinoText = arduinoIsLive()
     ? "arduino: " + int(arduinoPitchMm) + "mm/" + int(arduinoVolumeMm) + "mm"
     : "arduino: not connected, press O";
@@ -1257,36 +1898,55 @@ void drawHud(float freq, float amp, boolean wekinatorIsLive) {
     + " / accel: " + nf(movementAcceleration, 1, 2)
     + " / noise: " + nf(sensorNoise, 1, 2)
     + " / vib: " + nf(smoothVibrato, 1, 2)
-    + " / bright: " + nf(smoothBrightness, 1, 2);
+    + " / bright: " + nf(smoothBrightness, 1, 2)
+    + " / melody speed: " + nf(melodyStepSpeed, 1, 2);
   String logText = dataLogging ? "log on " + trainingLabel : "log off";
-  String practiceText = practiceMode ? "practice on" : "practice off";
+  String practiceText = practiceTypeLabelForData();
   String demoText = demoGuide ? "demo guide on" : "demo guide off";
 
+  textAlign(LEFT, TOP);
+  textSize(14);
   fill(255);
   text("Mode: " + mode + " / " + live + testText, 24, height - 154);
   text("Sound: " + muteText + " / Pitch: " + pitchText + noteText, 24, height - 132);
   text("Freq: " + int(freq) + " Hz / Amp: " + nf(amp, 1, 3) + " / OSC: " + sendText + " / " + profileText + " / Sent: " + oscSentCount, 24, height - 110);
   text("Input: " + inputText + " / " + cameraText + " / " + arduinoText + " / " + sensorText, 24, height - 82);
   text("Expression: " + expressiveText, 24, height - 58);
-  text("Keys: C input, X profile, P practice, L log, B/N demo, W Wekinator, Q pitch, F/G sens", 24, height - 34);
+  text("Session: arrows trainer, U presentation, C input, Q pitch, W Weki, P exercise, Z trajectory, G/F calibrate, L log", 24, height - 34);
 
   textAlign(RIGHT, TOP);
   fill(190);
-  text("pitch antenna proximity: " + nf(inputPitch, 1, 2), width - 24, 22);
-  text("volume loop distance: " + nf(inputVolume, 1, 2), width - 24, 44);
-  text("motion confidence: " + nf(handConfidence, 1, 2), width - 24, 66);
-  text("weki pitch: " + nf(wekiPitch, 1, 2), width - 24, 88);
-  text("weki volume: " + nf(wekiVolume, 1, 2), width - 24, 110);
-  text("weki vibrato: " + nf(wekiVibrato, 1, 2), width - 24, 132);
-  text("weki brightness: " + nf(wekiBrightness, 1, 2), width - 24, 154);
-  text(logText + " / rows " + dataLogRows + " / " + practiceText, width - 24, 176);
-  text("exercise: " + activeExerciseName + " / " + demoText, width - 24, 198);
+  float rightY = 78;
+  text("pitch antenna proximity: " + nf(inputPitch, 1, 2), width - 24, rightY);
+  text("volume loop distance: " + nf(inputVolume, 1, 2), width - 24, rightY + 22);
+  text("motion confidence: " + nf(handConfidence, 1, 2), width - 24, rightY + 44);
+  text("weki pitch: " + nf(wekiPitch, 1, 2), width - 24, rightY + 66);
+  text("weki volume: " + nf(wekiVolume, 1, 2), width - 24, rightY + 88);
+  text("weki vibrato: " + nf(wekiVibrato, 1, 2), width - 24, rightY + 110);
+  text("weki brightness: " + nf(wekiBrightness, 1, 2), width - 24, rightY + 132);
+  text(logText + " / rows " + dataLogRows + " / " + practiceText, width - 24, rightY + 154);
+  text("exercise: " + currentExerciseName() + " / " + demoText, width - 24, rightY + 176);
   if (inputMode == INPUT_EYES) {
-    text("eye raw: " + nf(eyeRawX, 1, 2) + ", " + nf(eyeRawY, 1, 2), width - 24, 220);
+    text("eye raw: " + nf(eyeRawX, 1, 2) + ", " + nf(eyeRawY, 1, 2), width - 24, rightY + 198);
   }
 }
 
+String currentExerciseName() {
+  if (practiceType == PRACTICE_TRAJECTORY) {
+    return trajectoryExerciseName;
+  }
+  if (practiceType == PRACTICE_MELODY) {
+    return activeExerciseName;
+  }
+  return "none";
+}
+
 String sensorStatusText() {
+  if (inputMode == INPUT_KEYBOARD) {
+    return "trainer pitch/vol: " + nf(keyboardPitch, 1, 2) + "/" + nf(keyboardVolume, 1, 2)
+      + " / melody speed: " + nf(melodyStepSpeed, 1, 2) + " steps/s"
+      + " / pitch start: " + int(pitchFieldStartX()) + "px";
+  }
   if (inputMode == INPUT_EYES) {
     return "eye gain X/Y: " + nf(eyeSensitivityX, 1, 1) + "/" + nf(eyeSensitivityY, 1, 1)
       + " / dark: " + int(eyeDarkOffset)
@@ -1296,14 +1956,38 @@ String sensorStatusText() {
     return "physical pitch/vol: " + nf(arduinoPitchControl, 1, 2) + "/" + nf(arduinoVolumeControl, 1, 2)
       + " / sensor speed: " + nf(arduinoSpeed, 1, 2);
   }
-  return "motion: " + motionPixels + " / threshold: " + int(motionThreshold);
+  return "motion: " + motionPixels + " / threshold: " + int(motionThreshold)
+    + " / pitch start: " + int(pitchFieldStartX()) + "px";
+}
+
+String cameraStatusText() {
+  if (cameraAvailable) {
+    return "camera on";
+  }
+  if (cameraStarting) {
+    int elapsed = millis() - cameraStartMillis;
+    if (elapsed > 4500) {
+      return "camera starting, check macOS permission";
+    }
+    return "camera starting";
+  }
+  return cameraStatus;
 }
 
 void drawPracticeOverlay() {
-  if (!practiceMode) {
+  if (practiceType == PRACTICE_OFF) {
     return;
   }
 
+  if (practiceType == PRACTICE_TRAJECTORY) {
+    drawTrajectoryPracticeOverlay();
+    return;
+  }
+
+  drawMelodyPracticeOverlay();
+}
+
+void drawMelodyPracticeOverlay() {
   int targetNote = practiceTargetMidi();
   float progress = constrain(practiceHoldSeconds / practiceRequiredSeconds, 0, 1);
   boolean noteMatches = currentMidiNote == targetNote && smoothVolume > 0.08;
@@ -1330,6 +2014,51 @@ void drawPracticeOverlay() {
   rect(panelX + 28, panelY + 68, panelW - 56, 10, 5);
   fill(noteMatches ? color(112, 232, 163) : color(255, 194, 80));
   rect(panelX + 28, panelY + 68, (panelW - 56) * progress, 10, 5);
+}
+
+void drawTrajectoryPracticeOverlay() {
+  float panelX = width * 0.5 - 190;
+  float panelY = 104;
+  float panelW = 380;
+  float panelH = 126;
+  boolean matched = trajectoryScore >= trajectoryRequiredScore && trajectoryCompletion > 0.72;
+
+  noStroke();
+  fill(12, 17, 24, 224);
+  rect(panelX, panelY, panelW, panelH, 7);
+
+  fill(255);
+  textAlign(CENTER, TOP);
+  textSize(18);
+  text(trajectoryExerciseName, width * 0.5, panelY + 12);
+
+  fill(matched ? color(112, 232, 163) : color(255, 194, 80));
+  textSize(14);
+  text(
+    "score " + int(trajectoryScore) + " / best " + int(trajectoryBestScore)
+      + " / reps " + trajectoryReps + " of " + trajectoryTargetReps
+      + " / " + (trajectoryExerciseIndex + 1) + "/" + max(1, trajectoryExercisePaths.size()),
+    width * 0.5,
+    panelY + 40
+  );
+
+  fill(205);
+  textSize(13);
+  text(trajectoryExerciseGoal, width * 0.5, panelY + 62);
+
+  fill(175);
+  text(
+    "gesture " + trajectoryDetectedGesture + " / target " + trajectoryExpectedGesture
+      + " / smooth " + int(trajectorySmoothness * 100)
+      + " / tol " + nf(trajectoryTolerance, 1, 2),
+    width * 0.5,
+    panelY + 78
+  );
+
+  fill(255, 255, 255, 45);
+  rect(panelX + 28, panelY + 102, panelW - 56, 10, 5);
+  fill(matched ? color(112, 232, 163) : color(88, 205, 255));
+  rect(panelX + 28, panelY + 102, (panelW - 56) * trajectoryCompletion, 10, 5);
 }
 
 void drawDemoOverlay() {
@@ -1362,7 +2091,7 @@ void drawDemoOverlay() {
 }
 
 int demoStepCount() {
-  return 5;
+  return 6;
 }
 
 String demoStepTitle() {
@@ -1376,6 +2105,9 @@ String demoStepTitle() {
     return "Practice game";
   }
   if (demoStep == 4) {
+    return "Rehab trajectory";
+  }
+  if (demoStep == 5) {
     return "Wekinator expression";
   }
   return "Direct theremin";
@@ -1392,6 +2124,9 @@ String demoStepSetup() {
     return "Press P for practice mode.";
   }
   if (demoStep == 4) {
+    return "Press P again for trajectory mode.";
+  }
+  if (demoStep == 5) {
     return "Press X for expressive 6x4, train Wekinator, then press W.";
   }
   return "Use mouse hand, DIRECT PREVIEW, sound on with M.";
@@ -1408,6 +2143,9 @@ String demoStepAction() {
     return "Hit and hold each target note until score advances.";
   }
   if (demoStep == 4) {
+    return "Follow the arc; DTW scores the movement path.";
+  }
+  if (demoStep == 5) {
     return "Compare learned stabilization, vibrato, and brightness.";
   }
   return "Move near/far from antennas for pitch and volume.";
@@ -1424,6 +2162,9 @@ String demoStepPurpose() {
     return "Connects music control with gamified exercise.";
   }
   if (demoStep == 4) {
+    return "Shows measurable movement practice for rehab-style tasks.";
+  }
+  if (demoStep == 5) {
     return "Shows AI as personalized expressive mapping.";
   }
   return "Establishes the fixed baseline before ML.";
@@ -1431,9 +2172,14 @@ String demoStepPurpose() {
 
 void loadExerciseConfig() {
   practiceMelodyMidi = subset(odeToJoyMidi, 0, odeToJoyMidi.length);
+  loadDefaultTrajectoryExercises();
+  boolean loadedTrajectoryConfig = false;
 
   try {
-    File configFile = new File(sketchPath("../config/exercises.json"));
+    File configFile = new File(sketchPath("../../../config/exercises.json"));
+    if (!configFile.exists()) {
+      configFile = new File(sketchPath("../config/exercises.json"));
+    }
     if (!configFile.exists()) {
       println("Exercise config not found, using built-in Ode to Joy practice.");
       return;
@@ -1447,32 +2193,136 @@ void loadExerciseConfig() {
 
     for (int i = 0; i < exercises.size(); i++) {
       JSONObject exercise = exercises.getJSONObject(i);
-      if (!"melody_hold".equals(jsonString(exercise, "type", ""))) {
-        continue;
-      }
+      String type = jsonString(exercise, "type", "");
 
-      JSONArray notes = exercise.getJSONArray("targetNotes");
-      if (notes == null || notes.size() == 0) {
-        continue;
+      if ("melody_hold".equals(type)) {
+        loadMelodyExercise(exercise);
+      } else if ("trajectory_match".equals(type)) {
+        if (!loadedTrajectoryConfig) {
+          clearTrajectoryExercises();
+          loadedTrajectoryConfig = true;
+        }
+        registerTrajectoryExercise(exercise);
       }
-
-      int[] parsedNotes = new int[notes.size()];
-      for (int n = 0; n < notes.size(); n++) {
-        parsedNotes[n] = midiFromNoteName(notes.getString(n));
-      }
-
-      practiceMelodyMidi = parsedNotes;
-      activeExerciseId = jsonString(exercise, "id", activeExerciseId);
-      activeExerciseName = jsonString(exercise, "name", activeExerciseName);
-      activeExerciseGoal = jsonString(exercise, "goal", activeExerciseGoal);
-      practiceRequiredSeconds = jsonFloat(exercise, "holdSeconds", practiceRequiredSeconds);
-      exerciseConfigLoaded = true;
-      println("Loaded exercise: " + activeExerciseName + " notes=" + practiceMelodyMidi.length);
-      return;
     }
+    setTrajectoryExercise(0);
   } catch (Exception e) {
     println("Exercise config could not be loaded: " + e.getMessage());
   }
+}
+
+void loadMelodyExercise(JSONObject exercise) {
+  JSONArray notes = exercise.getJSONArray("targetNotes");
+  if (notes == null || notes.size() == 0) {
+    return;
+  }
+
+  int[] parsedNotes = new int[notes.size()];
+  for (int n = 0; n < notes.size(); n++) {
+    parsedNotes[n] = midiFromNoteName(notes.getString(n));
+  }
+
+  practiceMelodyMidi = parsedNotes;
+  activeExerciseId = jsonString(exercise, "id", activeExerciseId);
+  activeExerciseName = jsonString(exercise, "name", activeExerciseName);
+  activeExerciseGoal = jsonString(exercise, "goal", activeExerciseGoal);
+  practiceRequiredSeconds = jsonFloat(exercise, "holdSeconds", practiceRequiredSeconds);
+  exerciseConfigLoaded = true;
+  println("Loaded melody exercise: " + activeExerciseName + " notes=" + practiceMelodyMidi.length);
+}
+
+void clearTrajectoryExercises() {
+  trajectoryExercisePaths.clear();
+  trajectoryExerciseIds.clear();
+  trajectoryExerciseNames.clear();
+  trajectoryExerciseGoals.clear();
+  trajectoryExpectedGestures.clear();
+  trajectoryExerciseTolerances.clear();
+  trajectoryExerciseRequiredScores.clear();
+  trajectoryExerciseRepetitions.clear();
+  trajectoryExerciseSampleCounts.clear();
+  trajectoryExerciseIndex = 0;
+}
+
+void registerTrajectoryExercise(JSONObject exercise) {
+  JSONArray path = exercise.getJSONArray("path");
+  if (path == null || path.size() < 2) {
+    return;
+  }
+
+  ArrayList<PVector> parsedPath = new ArrayList<PVector>();
+  for (int i = 0; i < path.size(); i++) {
+    JSONObject point = path.getJSONObject(i);
+    parsedPath.add(new PVector(
+      constrain(jsonFloat(point, "x", 0.5), 0, 1),
+      constrain(jsonFloat(point, "y", 0.5), 0, 1)
+    ));
+  }
+
+  registerTrajectoryExercise(
+    jsonString(exercise, "id", trajectoryExerciseId),
+    jsonString(exercise, "name", trajectoryExerciseName),
+    jsonString(exercise, "goal", trajectoryExerciseGoal),
+    jsonString(exercise, "expectedGesture", "controlled_reach"),
+    parsedPath,
+    jsonFloat(exercise, "tolerance", trajectoryTolerance),
+    jsonFloat(exercise, "requiredScore", trajectoryRequiredScore),
+    int(jsonFloat(exercise, "repetitions", trajectoryTargetReps)),
+    int(jsonFloat(exercise, "sampleCount", trajectorySampleCount))
+  );
+  exerciseConfigLoaded = true;
+}
+
+void registerTrajectoryExercise(
+  String id,
+  String name,
+  String goal,
+  String expectedGesture,
+  ArrayList<PVector> path,
+  float tolerance,
+  float requiredScore,
+  int repetitions,
+  int sampleCount
+) {
+  trajectoryExercisePaths.add(path);
+  trajectoryExerciseIds.add(id);
+  trajectoryExerciseNames.add(name);
+  trajectoryExerciseGoals.add(goal);
+  trajectoryExpectedGestures.add(expectedGesture);
+  trajectoryExerciseTolerances.add(tolerance);
+  trajectoryExerciseRequiredScores.add(requiredScore);
+  trajectoryExerciseRepetitions.add(repetitions);
+  trajectoryExerciseSampleCounts.add(sampleCount);
+  println("Registered trajectory exercise: " + name + " points=" + path.size());
+}
+
+void setTrajectoryExercise(int index) {
+  if (trajectoryExercisePaths.size() == 0) {
+    loadDefaultTrajectoryExercises();
+  }
+  trajectoryExerciseIndex = constrain(index, 0, max(0, trajectoryExercisePaths.size() - 1));
+  trajectoryTargetPath = trajectoryExercisePaths.get(trajectoryExerciseIndex);
+  trajectoryExerciseId = trajectoryExerciseIds.get(trajectoryExerciseIndex);
+  trajectoryExerciseName = trajectoryExerciseNames.get(trajectoryExerciseIndex);
+  trajectoryExerciseGoal = trajectoryExerciseGoals.get(trajectoryExerciseIndex);
+  trajectoryExpectedGesture = trajectoryExpectedGestures.get(trajectoryExerciseIndex);
+  trajectoryTolerance = trajectoryExerciseTolerances.get(trajectoryExerciseIndex);
+  trajectoryRequiredScore = trajectoryExerciseRequiredScores.get(trajectoryExerciseIndex);
+  trajectoryTargetReps = trajectoryExerciseRepetitions.get(trajectoryExerciseIndex);
+  trajectorySampleCount = trajectoryExerciseSampleCounts.get(trajectoryExerciseIndex);
+  resetTrajectoryPractice(false);
+}
+
+void loadDefaultTrajectoryExercises() {
+  clearTrajectoryExercises();
+  ArrayList<PVector> arc = new ArrayList<PVector>();
+  arc.add(new PVector(0.23f, 0.58f));
+  arc.add(new PVector(0.36f, 0.46f));
+  arc.add(new PVector(0.50f, 0.40f));
+  arc.add(new PVector(0.64f, 0.46f));
+  arc.add(new PVector(0.78f, 0.58f));
+  registerTrajectoryExercise("rehab_horizontal_arc", "Guided Reach Arc", "Follow the arc with a smooth controlled movement.", "arc", arc, 0.42, 72, 3, 48);
+  setTrajectoryExercise(0);
 }
 
 String jsonString(JSONObject object, String key, String fallback) {
@@ -1550,6 +2400,9 @@ String wekinatorProfileLabel() {
 }
 
 String inputModeLabel() {
+  if (inputMode == INPUT_KEYBOARD) {
+    return "keyboard trainer";
+  }
   if (inputMode == INPUT_MOTION) {
     return "camera motion";
   }

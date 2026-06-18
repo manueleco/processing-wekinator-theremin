@@ -27,7 +27,7 @@ to start/stop CSV logging.
 CSV files are written under:
 
 ```text
-processing_wekinator_theremin/data_logs/
+apps/processing_wekinator/processing_wekinator_theremin/data_logs/
 ```
 
 Use number keys to label the current recording context:
@@ -74,7 +74,7 @@ scripts/train_csvs.command
 To run the two steps manually, first check whether the dataset is ready:
 
 ```bash
-python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
+python ml/check_dataset.py apps/processing_wekinator/processing_wekinator_theremin/data_logs/session-*.csv
 ```
 
 The first real model should have:
@@ -89,7 +89,7 @@ clear variation in pitch, volume, movement speed, and noise
 If the checker says `ready=true`, train:
 
 ```bash
-python ml/train_sensor_fusion.py processing_wekinator_theremin/data_logs/session-*.csv
+python ml/train_sensor_fusion.py apps/processing_wekinator/processing_wekinator_theremin/data_logs/session-*.csv
 ```
 
 For a quick smoke test on an incomplete dataset:
@@ -106,6 +106,23 @@ target_volume
 target_vibrato
 target_brightness
 ```
+
+CSV files may also include helper columns for analysis and demo documentation:
+
+```text
+keyboard_pitch
+keyboard_volume
+melody_step_speed
+trajectory_score
+trajectory_distance
+trajectory_reps
+trajectory_tolerance
+trajectory_smoothness
+trajectory_path_length
+trajectory_direction_changes
+```
+
+The starter model uses `melody_step_speed` and trajectory columns when they are present. If an older CSV does not include them, the trainer fills those optional features with `0.0` so previous logs remain usable.
 
 Outputs are saved under:
 
@@ -149,6 +166,10 @@ arduino_pitch_control
 arduino_volume_control
 arduino_speed
 arduino_confidence
+melody_step_speed
+trajectory_score
+trajectory_distance
+trajectory_reps
 ```
 
 Outputs:

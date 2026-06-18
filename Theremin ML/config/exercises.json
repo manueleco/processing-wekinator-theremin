@@ -23,6 +23,58 @@
       "goal": "Practice controlled left-center-right movement."
     },
     {
+      "id": "rehab_horizontal_arc",
+      "name": "Guided Reach Arc",
+      "type": "trajectory_match",
+      "expectedGesture": "arc",
+      "path": [
+        { "x": 0.23, "y": 0.58 },
+        { "x": 0.36, "y": 0.46 },
+        { "x": 0.50, "y": 0.40 },
+        { "x": 0.64, "y": 0.46 },
+        { "x": 0.78, "y": 0.58 }
+      ],
+      "sampleCount": 48,
+      "tolerance": 0.42,
+      "requiredScore": 72,
+      "repetitions": 3,
+      "goal": "Follow the arc with a smooth controlled movement."
+    },
+    {
+      "id": "rehab_vertical_reach",
+      "name": "Shoulder Flexion Reach",
+      "type": "trajectory_match",
+      "expectedGesture": "reach_up",
+      "path": [
+        { "x": 0.50, "y": 0.72 },
+        { "x": 0.50, "y": 0.58 },
+        { "x": 0.50, "y": 0.44 },
+        { "x": 0.50, "y": 0.30 }
+      ],
+      "sampleCount": 42,
+      "tolerance": 0.36,
+      "requiredScore": 74,
+      "repetitions": 3,
+      "goal": "Reach upward along the vertical guide with controlled speed."
+    },
+    {
+      "id": "rehab_diagonal_reach",
+      "name": "Diagonal Cross-Body Reach",
+      "type": "trajectory_match",
+      "expectedGesture": "diagonal_up_right",
+      "path": [
+        { "x": 0.26, "y": 0.70 },
+        { "x": 0.40, "y": 0.58 },
+        { "x": 0.56, "y": 0.46 },
+        { "x": 0.72, "y": 0.34 }
+      ],
+      "sampleCount": 44,
+      "tolerance": 0.38,
+      "requiredScore": 73,
+      "repetitions": 3,
+      "goal": "Move diagonally across the body toward the target."
+    },
+    {
       "id": "stability_training",
       "name": "Stability Training",
       "type": "stability",
@@ -41,4 +93,3 @@
     }
   ]
 }
-

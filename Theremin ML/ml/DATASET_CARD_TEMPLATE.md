@@ -40,7 +40,7 @@ Wekinator mode/direct mode:
 Run:
 
 ```bash
-python ml/check_dataset.py processing_wekinator_theremin/data_logs/session-*.csv
+python ml/check_dataset.py apps/processing_wekinator/processing_wekinator_theremin/data_logs/session-*.csv
 ```
 
 Record:
@@ -50,6 +50,36 @@ Rows:
 Labels:
 Ready:
 Warnings:
+```
+
+## Columns
+
+Required model columns:
+
+```text
+input_pitch
+input_volume
+movement_speed
+movement_acceleration
+hand_confidence
+sensor_noise
+target_pitch
+target_volume
+target_vibrato
+target_brightness
+```
+
+Optional exercise/scoring columns:
+
+```text
+melody_step_speed
+trajectory_score
+trajectory_distance
+trajectory_reps
+trajectory_tolerance
+trajectory_smoothness
+trajectory_path_length
+trajectory_direction_changes
 ```
 
 ## Privacy / Safety

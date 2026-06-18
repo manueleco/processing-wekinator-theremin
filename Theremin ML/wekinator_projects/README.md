@@ -10,6 +10,18 @@ Save the first real trained project as:
 wekinator_projects/expressive_6x4/
 ```
 
+A ready-to-open scaffold for the expressive demo is included at:
+
+```text
+wekinator_projects/expressive_6x4/AdaptiveExpressiveTheremin6x4/AdaptiveExpressiveTheremin6x4.wekproj
+```
+
+The first saved bootstrap-trained project is:
+
+```text
+wekinator_projects/thereminwekinator/theremin/theremin.wekproj
+```
+
 Use this setup:
 
 ```text
@@ -36,3 +48,5 @@ When a trained project is added, include a short note in its folder with:
 ## Important
 
 Do not present a generated or untested Wekinator project as final. The meaningful artifact is a model trained from a real interaction session, then tested in Processing with `W` mode enabled.
+
+If time is short, `tools/train_wekinator_demo.py` can create a bootstrap model by sending synthetic examples through Wekinator's OSC control messages. Treat that as a recoverable demo baseline, then add real examples manually when possible.

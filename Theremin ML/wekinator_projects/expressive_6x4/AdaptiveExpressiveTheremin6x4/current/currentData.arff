@@ -1,0 +1,17 @@
+@relation dataset
+
+@attribute ID numeric
+@attribute Time date 'yyyy/MM/dd HH:mm:ss:SSS'
+@attribute 'Training round' numeric
+@attribute pitch_proximity numeric
+@attribute volume_distance numeric
+@attribute movement_speed numeric
+@attribute movement_acceleration numeric
+@attribute tracking_confidence numeric
+@attribute sensor_noise numeric
+@attribute stabilized_pitch numeric
+@attribute stabilized_volume numeric
+@attribute vibrato_amount numeric
+@attribute timbre_brightness numeric
+
+@data
